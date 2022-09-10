@@ -37,13 +37,13 @@ label_counter = {
 }
 
 cache_map = {
-    "entailment->contradiction": 4,
-    "contradiction->entailment": 5,
-    "entailment->neutral": 6,
-    "contradiction->neutral": 7
+    "entailment->contradiction": 0,
+    "contradiction->entailment": 1,
+    "entailment->neutral": 2,
+    "contradiction->neutral": 3
 }
 
-openai.api_key = "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"
+openai.api_key = "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"
 openai.organization = "org-w7nKit9OwsqNNO3i9GmXe5uk"
 
 runner = wandb.init(
@@ -52,8 +52,6 @@ runner = wandb.init(
     name="gpt_generation_logger"
 )
 
-
-#db_client = pymongo.MongoClient("mongodb://localhost:27017/")
 
 class Example:
     """Stores an input, output pair and formats it to prime the model."""
@@ -192,7 +190,7 @@ def build_problems(args, cache):
         hypothesis = data["hypothesis"]
         label = data["label"]
         try:
-            all_spans = list(set(data["all_spans_p"]))
+            all_spans = list(set(data["new_span_p"]))
             if len(all_spans) > 0:
                 spans_to_mask = random.choices(all_spans, k=2)
             else:
@@ -457,7 +455,7 @@ if __name__ == '__main__':
     to_label = args.to_label
     mode = args.mode
 
-    args.data_pth = f"./data/{args.dataset}/{label}_spans.jsonl"
+    args.data_pth = f"./data/{args.dataset}/{label}.jsonl"
     args.demo_pth = f"{args.demo_dir}/{label}_{to_label}.jsonl"
     args.out_pth = f"{args.out_dir}/{args.dataset}_{label}_{to_label}_{args.start}_{args.end}.jsonl"
 
