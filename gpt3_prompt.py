@@ -43,7 +43,7 @@ cache_map = {
     "contradiction->neutral": 3
 }
 
-openai.api_key = "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"
+openai.api_key = "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"
 openai.organization = "org-w7nKit9OwsqNNO3i9GmXe5uk"
 
 runner = wandb.init(
