@@ -43,7 +43,7 @@ cache_map = {
     "contradiction->neutral": 3
 }
 
-openai.api_key = "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"
+openai.api_key = "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"
 openai.organization = "org-w7nKit9OwsqNNO3i9GmXe5uk"
 
 runner = wandb.init(
@@ -177,13 +177,9 @@ def decode(args, data_loader, tok=None, model=None):
 def build_problems(args, cache):
     train_ds = read_jsonl(args.data_pth)
     train_subset = train_ds[args.start:args.end]
+
     problems = []
     guids = []
-    label_new = label_map[to_label]
-    #is_neutral = args.to_label == "neutral"
-    is_neutral = False
-
-    instruction = f"Complete the story with creative content so that the conclusion is {label_new}. Do not repeat the conclusion."
 
     for data in tqdm(train_subset):
         premise = data["premise"]
@@ -191,50 +187,29 @@ def build_problems(args, cache):
         label = data["label"]
         try:
             all_spans = list(set(data["new_span_p"]))
-            if len(all_spans) > 0:
-                spans_to_mask = random.choices(all_spans, k=2)
-            else:
-                spans_to_mask = []
         except KeyError:
-            print(data)
-            continue
+            all_spans = list(set(data["all_spans_p"]))
+
+        if len(all_spans) > 0:
+            spans_to_mask = random.choices(all_spans, k=2)
+        else:
+            spans_to_mask = []
 
         for i, span in enumerate(spans_to_mask):
             guid = f"{data['guid']}_{i}"
+            prompt = f"story: {premise.replace(span, '[blank]')}\n conclusion: {hypothesis}\n output:"
 
-            if is_neutral:
-                masked = premise.replace(span, '[blank]').split('[blank]')
-                if len(masked) == 1:
-                    continue
-                prompt = masked[0]
-                suffix = f"{masked[1].strip()}"
-
-                probelm = {
-                    "guid": guid,
-                    "premise": premise,
-                    "hypothesis": hypothesis,
-                    "label": label,
-                    "new_label": to_label,
-                    "prompt": prompt,
-                    "suffix": suffix,
-                    "span_prev": span,
-                    "gen_out": "",
-                    "accept": False
-                }
-
-            else:
-                prompt = f"story: {premise.replace(span, '[blank]')}\n conclusion: {hypothesis}\n output:"
-                probelm = {
-                    "guid": guid,
-                    "premise": premise,
-                    "hypothesis": hypothesis,
-                    "label": label,
-                    "new_label": to_label,
-                    "prompt": prompt,
-                    "span_prev": span,
-                    "gen_out": "",
-                    "accept": False
-                }
+            probelm = {
+                "guid": guid,
+                "premise": premise,
+                "hypothesis": hypothesis,
+                "label": label,
+                "new_label": to_label,
+                "prompt": prompt,
+                "span_prev": span,
+                "gen_out": "",
+                "accept": False
+            }
 
             if cache.exists(guid) == 0:
                 cache.set(guid, json.dumps(probelm))
@@ -249,7 +224,7 @@ def build_problems(args, cache):
     return guids, problems
 
 
-def build_masked_nli_perturbation(demo_pth, to_label, prompt_type=1):
+def build_masked_nli_perturbation(demo_pth, to_label):
     examples = []
     counter_data = read_jsonl(demo_pth)
     label_new = label_map[to_label]
@@ -311,8 +286,8 @@ def prompt_perturbation(args, cache, encoder):
         args.demo_pth,
         args.to_label
     )
-    print(instruction)
 
+    logger.info(f"Prompting Instruction: {instruction}")
     random.shuffle(perturbations)
 
     logger.info("Build prompt: enumerate problems")
@@ -349,15 +324,15 @@ def prompt_perturbation(args, cache, encoder):
                 del record["new_premise"]
 
             prompt = gpt_prompt.craft_query(
-                      record['prompt'],
-                      instruction=instruction)
+                record['prompt'],
+                instruction=instruction)
 
             response = openai.Completion.create(
                 engine="text-davinci-002",
                 prompt=prompt,
                 # n=1,
                 # best_of=2,
-                top_p = 1.0,
+                top_p=1.0,
                 temperature=0.8,
                 max_tokens=256,
                 frequency_penalty=0.7,
@@ -374,56 +349,12 @@ def prompt_perturbation(args, cache, encoder):
     return generation_outputs
 
 
-def prompt_perturbation_neutral(args, cache, encoder):
-    logger.info("Build prompt: enumerate problems")
-    guids, problems = build_problems(args, cache)
-
-    generation_outputs = []
-    logger.info(f"Prompting {len(problems)} problems ...")
-
-    for i, guid in enumerate(guids):
-        record = json.loads(cache.get(guid))
-        if not record["accept"]:
-            if i > 0 and i % 100 == 0:
-                logger.info(
-                    f"=============== Prompting progress: {len(generation_outputs)} problems ===============")
-
-            if "new_premise" in record:
-                del record["new_premise"]
-
-            response = openai.Completion.create(
-                engine="text-davinci-002",
-                prompt=record['prompt'],
-                suffix=record['suffix'],
-                n=1,
-                stop=["stop", "\n", "\n\n"],
-                temperature=0.75,
-                max_tokens=256,
-                frequency_penalty=0.8,
-                presence_penalty=0.5
-            )
-
-            output = response['choices'][0]['text'].replace("\n", "").strip()
-            record["gen_out"] = output
-            cache.set(guid, json.dumps(record))
-
-            generation_outputs.append(record)
-
-    logger.info(f"Receiving {len(generation_outputs)} generation outputs")
-
-    return generation_outputs
-
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--label', type=str, default="entailment",
                         help="the current label: entailment | contradiction | neutral")
     parser.add_argument('--to_label', type=str, default="contradiction",
                         help="the desired label: entailment | contradiction | neutral")
-    parser.add_argument('--mode', type=str, default="premise",
-                        help="perturbation mode: premise | hypothesis")
-    parser.add_argument('--prompt_type', type=int, default=0,
-                        help="choose prompt format: 0 | 1")
     parser.add_argument('--out_dir', type=str, default="./data/output",
                         help="output directory")
     parser.add_argument('--filter_dir', type=str, default="./data/filtered",
@@ -453,7 +384,6 @@ if __name__ == '__main__':
 
     label = args.label
     to_label = args.to_label
-    mode = args.mode
 
     args.data_pth = f"./data/{args.dataset}/{label}.jsonl"
     args.demo_pth = f"{args.demo_dir}/{label}_{to_label}.jsonl"
@@ -473,8 +403,9 @@ if __name__ == '__main__':
     counter_data = prompt_perturbation(args, cache, encoder)
 
     #counter_data = read_jsonl("data/output/contradiction_entailment_premise_1.jsonl")
-    #for cd in counter_data:
+    # for cd in counter_data:
     #    cache.set(cd["guid"], json.dumps(cd))
+
     """counter_data = []
     for key in cache.keys():
         record = json.loads(cache[key])
@@ -482,6 +413,7 @@ if __name__ == '__main__':
             del record["new_premise"]
         if not record["accept"]:
             counter_data.append(record)"""
+
     counter_ds = FilterDataset(counter_data)
 
     logger.info("Filtering generated counterfactual data")
