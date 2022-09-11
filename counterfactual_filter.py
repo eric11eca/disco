@@ -154,6 +154,7 @@ class NLICounterfactualFilter:
 
         scores1 = []
         scores2 = []
+        diverges = []
         for model_name in self.hf_model_names:
             preds, counter_preds = self.predict(
                 batch, batch_counter, model_name)
@@ -163,17 +164,19 @@ class NLICounterfactualFilter:
                                         prev_label_ids, new_label_ids)
             scores1.append(scores[0])
             scores2.append(scores[1])
+            diverges.append(scores[2])
 
         voting1 = self.ensemble(torch.stack(
             scores1, -1)).to("cpu").numpy().tolist()
         voting2 = self.ensemble(torch.stack(
             scores2, -1)).to("cpu").numpy().tolist()
-        for i, s in enumerate(zip(voting1, voting2)):
-            # print(counter_data['gen_out'][i])
-            # print(s[1])
-            if s[1] > threshold and s[1] > s[0] and mode == "counter":
+        divergency = self.ensemble(torch.stack(
+            diverges, -1)).to("cpu").numpy().tolist()
+
+        for i, s in enumerate(zip(voting1, voting2, diverges)):
+            if mode == "counter" and s[1] > threshold and s[1] > s[0]:
                 counter_data["accept"][i] = True
-            if scores[3] * 100 < 0.1 and mode == "inv":
-                counter_data["accept"][i] = True
+            if mode == "inv" and divergency[i] * 100 < 0.1:
+                counter_data["accept_inv"][i] = True
 
         return self.post_process_batch(counter_data, batch_counter)
