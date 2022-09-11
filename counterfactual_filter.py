@@ -1,6 +1,9 @@
 import torch
 import json
 
+from torch.nn import KLDivLoss
+from torch.nn.functional import log_softmax
+
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 label_map = {
@@ -41,7 +44,8 @@ class NLICounterfactualFilter:
             # "textattack/distilbert-base-cased-snli",
             # "MoritzLaurer/DeBERTa-v3-base-mnli",
             "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
-            #"ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli"
+            # "alisawuffles/roberta-large-wanli",
+            # "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli"
         ]
 
         self.tokenizers = {}
@@ -101,10 +105,20 @@ class NLICounterfactualFilter:
                             torch.mul(preds_counter, prev_label_ids), -1)
         counter = torch.sum(torch.mul(preds_counter, new_label_ids) -
                             torch.mul(preds, new_label_ids), -1)
-        return natural, counter
+
+        kl_loss = KLDivLoss(reduction="batchmean", log_target=True)
+
+        divergencies = []
+        for (logit, logit_inv) in zip(natural, counter):
+            logit = log_softmax(logit, dim=-1)
+            logit_inv = log_softmax(logit_inv, dim=-1)
+            diverge = kl_loss(logit, logit_inv)
+            divergencies.append(diverge)
+
+        return natural, counter, divergencies
 
     def ensemble(self, scores, mode="softmax"):
-        if(mode == "softmax"):
+        if (mode == "softmax"):
             scores_prob = torch.softmax(scores, -1)
             totals = torch.mul(scores_prob, scores)
             return torch.sum(totals, -1)
@@ -134,7 +148,7 @@ class NLICounterfactualFilter:
             filtered_data.append(record)
         return filtered_data
 
-    def filter(self, counter_data, threshold=0.5):
+    def filter(self, counter_data, threshold=0.5, mode="counter"):
         batch, batch_counter, label, to_label = self.preprocess_batch(
             counter_data)
 
@@ -145,17 +159,21 @@ class NLICounterfactualFilter:
                 batch, batch_counter, model_name)
             prev_label_ids, new_label_ids = self.encode_label(
                 label, to_label)
-            score = self.critic_metric(preds, counter_preds,
-                                       prev_label_ids, new_label_ids)
-            scores1.append(score[0])
-            scores2.append(score[1])
+            scores = self.critic_metric(preds, counter_preds,
+                                        prev_label_ids, new_label_ids)
+            scores1.append(scores[0])
+            scores2.append(scores[1])
 
-        voting1 = self.ensemble(torch.stack(scores1, -1)).to("cpu").numpy().tolist()
-        voting2 = self.ensemble(torch.stack(scores2, -1)).to("cpu").numpy().tolist()
+        voting1 = self.ensemble(torch.stack(
+            scores1, -1)).to("cpu").numpy().tolist()
+        voting2 = self.ensemble(torch.stack(
+            scores2, -1)).to("cpu").numpy().tolist()
         for i, s in enumerate(zip(voting1, voting2)):
-            #print(counter_data['gen_out'][i])
-            #print(s[1])
-            if s[1] > threshold and s[1] > s[0]:
+            # print(counter_data['gen_out'][i])
+            # print(s[1])
+            if s[1] > threshold and s[1] > s[0] and mode == "counter":
+                counter_data["accept"][i] = True
+            if scores[3] * 100 < 0.1 and mode == "inv":
                 counter_data["accept"][i] = True
 
         return self.post_process_batch(counter_data, batch_counter)
