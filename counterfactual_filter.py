@@ -2,7 +2,7 @@ import torch
 import json
 
 from torch.nn import KLDivLoss
-from torch.nn.functional import log_softmax
+from torch.nn.functional import log_softmax, softmax
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
@@ -111,7 +111,7 @@ class NLICounterfactualFilter:
         divergencies = []
         for (logit, logit_inv) in zip(natural, counter):
             logit = log_softmax(logit, dim=-1)
-            logit_inv = log_softmax(logit_inv, dim=-1)
+            logit_inv = softmax(logit_inv, dim=-1)
             diverge = kl_loss(logit, logit_inv)
             divergencies.append(diverge)
 
