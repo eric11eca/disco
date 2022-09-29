@@ -1,0 +1,8 @@
+pytorch-lightning
+transformers
+datasets
+openai
+wandb
+redis
+torch
+sentence-transformers==2.2.2
