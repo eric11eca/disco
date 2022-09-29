@@ -4,6 +4,7 @@ import string
 import logging
 import argparse
 import pprint
+import wandb
 import numpy as np
 import textdistance as tdist
 
@@ -14,11 +15,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+runner = wandb.init(
+    project="gpt3-counterfactual-generation",
+    entity="causal_scaffold",
+    name="gpt_generation_logger"
+)
+
 cache_map = {
-    "e2c": 4,
-    "c2e": 5,
-    "e2n": 6,
-    "c2n": 7
+    "snli": {
+        "e2c": 10,
+        "c2e": 11,
+        "e2n": 2,
+        "c2n": 3
+    },
+    "wanli": {
+        "e2c": 4,
+        "c2e": 5,
+        "e2n": 6,
+        "c2n": 7
+    }
 }
 
 forbidden_phrases = ['It is true', 'It is false',
@@ -83,10 +98,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--type', type=str, default="e2c",
                         help="type of counterfactual: e2c | c2e | e2n | c2n")
+    parser.add_argument('--dataset', type=str, default="snli",
+                        help="target dataset for counterfactual generation")
 
     args = parser.parse_args()
 
-    r_cache = redis.Redis(host='localhost', port=6379, db=cache_map[args.type])
+    r_cache = redis.Redis(host='localhost', port=6379, db=cache_map[args.dataset][args.type])
 
     logger.info(f"Number of total data: {len(r_cache.keys())}")
 
@@ -125,4 +142,12 @@ if __name__ == '__main__':
 
     pprint.pprint(discards)
 
-    write_jsonl(accepted, f"./data/filtered/{args.type}.jsonl")
+    accepted_path = f"./data/filtered/{args.dataset}/{args.type}.jsonl"
+    #write_jsonl(accepted, accepted_path)
+
+    artifact = wandb.Artifact(
+        f"{args.dataset}_{args.type}",
+        type='dataset'
+    )
+    artifact.add_file(accepted_path)
+    runner.log_artifact(artifact)

@@ -12,7 +12,6 @@ label_map = {
     "neutral": 1
 }
 
-
 def to_jsonl(data):
     return json.dumps(data).replace("\n", "")
 
@@ -43,8 +42,8 @@ class NLICounterfactualFilter:
         self.hf_model_names = [
             # "textattack/distilbert-base-cased-snli",
             # "MoritzLaurer/DeBERTa-v3-base-mnli",
-            "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
-            # "alisawuffles/roberta-large-wanli",
+            # "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
+            "alisawuffles/roberta-large-wanli",
             # "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli"
         ]
 
@@ -69,6 +68,7 @@ class NLICounterfactualFilter:
             return_tensors="pt",
             truncation=True,
             padding=True,
+            max_length=256,
             return_token_type_ids=False
         )
         input_seq_pair = input_seq_pair.to("cuda")
@@ -78,6 +78,7 @@ class NLICounterfactualFilter:
             return_tensors="pt",
             truncation=True,
             padding=True,
+            max_length=256,
             return_token_type_ids=False
         )
         counter_seq_pair = counter_seq_pair.to("cuda")
@@ -155,28 +156,33 @@ class NLICounterfactualFilter:
         scores1 = []
         scores2 = []
         diverges = []
+        y_preds = []
+        y_trues = []
         for model_name in self.hf_model_names:
             preds, counter_preds = self.predict(
                 batch, batch_counter, model_name)
             prev_label_ids, new_label_ids = self.encode_label(
                 label, to_label)
+            prob = torch.softmax(preds, dim=1)
+            y_pred = torch.argmax(prob, dim=1)
+            y_true = torch.argmax(new_label_ids, dim=1)
             scores = self.critic_metric(preds, counter_preds,
                                         prev_label_ids, new_label_ids)
             scores1.append(scores[0])
             scores2.append(scores[1])
             diverges.append(scores[2])
+            y_preds += y_pred.to("cpu").numpy().tolist()
+            y_trues += y_true.to("cpu").numpy().tolist()
 
         voting1 = self.ensemble(torch.stack(
             scores1, -1)).to("cpu").numpy().tolist()
         voting2 = self.ensemble(torch.stack(
             scores2, -1)).to("cpu").numpy().tolist()
-        divergency = self.ensemble(torch.stack(
-            diverges, -1)).to("cpu").numpy().tolist()
 
-        for i, s in enumerate(zip(voting1, voting2, diverges)):
-            if mode == "counter" and s[1] > threshold and s[1] > s[0]:
+        for i, s in enumerate(zip(voting1, voting2, y_preds, y_trues)):
+            if mode == "counter" and s[2] == s[3]:
                 counter_data["accept"][i] = True
-            if mode == "inv" and divergency[i] * 100 < 0.1:
-                counter_data["accept_inv"][i] = True
+            elif mode == "counter" and s[1] > threshold and s[1] > s[0]:
+                counter_data["accept"][i] = True
 
         return self.post_process_batch(counter_data, batch_counter)
