@@ -1,5 +1,4 @@
 import json
-from pickle import FALSE
 import wandb
 import openai
 import redis
@@ -104,7 +103,7 @@ if __name__ == '__main__':
 
     args.lable = label
     args.to_label = to_label
-    args.generate = False
+    args.generate = True
 
     if args.dataset == "snli":
         args.data_pth = f"./data/input/{args.dataset}/{label}_spans.jsonl"
@@ -142,41 +141,45 @@ if __name__ == '__main__':
             record[f"new_{args.mode}"] = record[args.mode].replace(
                 record["span_prev"], record["gen_out"]
             )
-            if not record["accept"]:
-                if args.gen_type == "insertion" and "prompt" in record:
-                    alien_counter_data.append(record)
-                else:
-                    counter_data.append(record)
+            if args.gen_type == "insertion" and "prompt" in record:
+                alien_counter_data.append(record)
+            else:
+                counter_data.append(record)
+    logger.info(f"Filtering {len(counter_data)} counterfactuals")
 
     heuristic_filter = AutomaticHeuristicFilter()
     ppl_filter = PerplexityFilter()
-    logger.info(
-        f"Filtering thorugh Heuristic and Perplexity Filter")
-
-    h_filtered = heuristic_filter.run(counter_data, cache, args.mode)
-    ppl_filtered = ppl_filter.run(h_filtered, cache, args.mode)
-
     nli_filter = NLIEnsembleFilter(cache, args.mode, args.local_rank)
     logger.info(
-        f"Initializing {len(nli_filter.hf_model_names)} filtering models")
+        f"Initialized {len(nli_filter.hf_model_names)} filtering models")
 
-    counter_ds = FilterDataset(ppl_filtered)
+    logger.info(f"Filtering thorugh Heuristic Filter ...")
+    h_filtered = heuristic_filter.run(counter_data, cache, args.mode)
+
+    counter_ds = FilterDataset(h_filtered)
     loader = DataLoader(counter_ds, batch_size=32, shuffle=False)
 
     logger.info("Filtering through NLI Ensemble Filter ...")
+    filtered_batch = []
     for i, batch in enumerate(tqdm(loader)):
-        filtered_batch = nli_filter.filter(batch, threshold=0.3)
-        if i > 0:
-            write_jsonl(filtered_batch, args.out_pth, mode="a")
-        else:
-            write_jsonl(filtered_batch, args.out_pth, mode="w")
+        filtered_batch += nli_filter.filter(batch, threshold=0.3)
+
+    write_jsonl(filtered_batch, args.out_pth, mode="w")
+
+    accepted_batch = [
+        record for record in filtered_batch if record["accept"]]
+    logger.info(f"Accepted {len(accepted_batch)} counterfactuals")
+
+    logger.info("Filtering through Perplexity Filter ...")
+    p_filtered = ppl_filter.run(
+        accepted_batch, cache, args.mode, threshold=150)
 
     artifact = wandb.Artifact(
         f"{args.dataset}_{label}_{to_label}_{args.start}_{args.end}",
         type='dataset'
     )
-    # artifact.add_file(args.out_pth)
-    # runner.log_artifact(artifact)
+    artifact.add_file(args.out_pth)
+    runner.log_artifact(artifact)
 
     accepted, rejected = collect_accepted(cache)
     logger.info(f"Number of total accepted data: {len(accepted)}")
