@@ -33,26 +33,15 @@ class AutomaticHeuristicFilter:
     def _normalize(self, text):
         return self._strip_punctuation_and_casing(text)
 
-    def heuristic_filtering(self, data):
+    def heuristic_filtering(self, data, mode):
         premise = self._normalize(data["premise"])
         hypothesis = self._normalize(data["hypothesis"])
         gen_out = self._normalize(data["gen_out"])
 
-        if 'new_premise' in data:
-            if isinstance(data['new_premise'], list):
-                new_premise = self._normalize(data['new_premise'][0])
-            else:
-                new_premise = self._normalize(data['new_premise'])
+        if isinstance(data[f"new_{mode}"], list):
+            new_input = self._normalize(data[f"new_{mode}"][0])
         else:
-            new_premise = None
-
-        if 'new_hypothesis' in data:
-            if isinstance(data['new_hypothesis'], list):
-                new_hypothesis = self._normalize(data['new_hypothesis'][0])
-            else:
-                new_hypothesis = self._normalize(data['new_hypothesis'])
-        else:
-            new_hypothesis = None
+            new_input = self._normalize(data[f"new_{mode}"])
 
         if gen_out == hypothesis:
             return True, "copied_hypothesis"
@@ -66,14 +55,16 @@ class AutomaticHeuristicFilter:
             return True, "overlap_hypothesis"
         elif tdist.jaccard(gen_out.split(), premise.split()) > 0.35:
             return True, "overlap_premise"
-        elif tdist.jaccard(new_premise.split(), hypothesis.split()) > 0.5:
-            return True, "overlap_hypothesis_all"
         elif np.any([x in gen_out for x in forbidden_phrases]):
             return True, "forbidden_phrase"
         elif data["new_label"] == "contradiction" and np.any([x in gen_out for x in negation_words]):
             return True, "negation_word"
         elif data["new_label"] == "neutral" and "_" in gen_out:
             return True, "large_gap"
+        elif mode == "premise" and tdist.jaccard(new_input.split(), hypothesis.split()) > 0.5:
+            return True, "overlap_hypothesis_all"
+        elif mode == "hypothesis" and tdist.jaccard(new_input.split(), hypothesis.split()) > 0.8:
+            return True, "overlap_hypothesis_all"
         return False, "none"
 
     def run(self, outputs, cache, mode):
@@ -92,7 +83,7 @@ class AutomaticHeuristicFilter:
 
         accepted = []
         for record in outputs:
-            blocked, reason = self.heuristic_filtering(record)
+            blocked, reason = self.heuristic_filtering(record, mode)
             if blocked:
                 record["accept"] = False
                 cache.set(record['guid'], json.dumps(record))
