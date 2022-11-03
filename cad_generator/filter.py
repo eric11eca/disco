@@ -4,12 +4,10 @@ import torch
 import numpy as np
 import textdistance as tdist
 
-from torch.nn import KLDivLoss
-from torch.nn.functional import log_softmax, softmax
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from evaluate import load
 from pprint import pprint
+from torch.utils.data import DataLoader
 
 from transformers import (
     AutoTokenizer,
@@ -55,11 +53,13 @@ class AutomaticHeuristicFilter:
             return True, "overlap_hypothesis"
         elif tdist.jaccard(gen_out.split(), premise.split()) > 0.35:
             return True, "overlap_premise"
-        elif np.any([x in gen_out for x in forbidden_phrases]):
+        elif np.any([x in data["gen_out"] for x in forbidden_phrases]):
             return True, "forbidden_phrase"
         elif data["new_label"] == "contradiction" and np.any([x in gen_out for x in negation_words]):
             return True, "negation_word"
-        elif data["new_label"] == "neutral" and "_" in gen_out:
+        elif "_" in data["gen_out"]:
+            return True, "large_gap"
+        elif "________" in data["gen_out"]:
             return True, "large_gap"
         elif mode == "premise" and tdist.jaccard(new_input.split(), hypothesis.split()) > 0.5:
             return True, "overlap_hypothesis_all"
@@ -107,7 +107,7 @@ class PerplexityFilter:
 
         accepted_id = []
         rejected_id = []
-        for i, batch in enumerate(tqdm(loader)):
+        for i, batch in enumerate(tqdm(loader, position=0, leave=True)):
             ppls = self.perplexity.compute(
                 predictions=batch[f"new_{mode}"],
                 model_id='gpt2'
@@ -119,9 +119,26 @@ class PerplexityFilter:
             accepted_id += [batch['guid'][idx] for idx in accepted_ppl]
             rejected_id += [batch['guid'][idx] for idx in rejected_ppl]
 
+            # for idx in accepted_ppl:
+            #     record = {
+            #         "guid": batch['guid'][idx],
+            #         "premise": batch['premise'][idx],
+            #         "hypothesis": batch['hypothesis'][idx],
+            #         "label": batch['label'][idx],
+            #         "new_label": batch['new_label'][idx],
+            #         "prefix": batch['prefix'][idx],
+            #         "suffix": batch['suffix'][idx],
+            #         "span_prev": batch['span_prev'][idx],
+            #         "gen_out": batch['gen_out'][idx],
+            #         "new_premise": batch['new_premise'][idx],
+            #         "accept": True
+            #     }
+            #     accepted.append(record)
+
         for guid in accepted_id:
             record = json.loads(cache.get(guid))
             accepted.append(record)
+            cache.set(guid, json.dumps(record))
 
         for guid in rejected_id:
             record = json.loads(cache.get(guid))
@@ -135,9 +152,10 @@ class NLIEnsembleFilter:
 
     def __init__(self, cache, mode, local_rank) -> None:
         self.hf_model_names = [
-            "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
-            "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli",
-            "alisawuffles/roberta-large-wanli"
+            # "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
+            # "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli",
+            # "alisawuffles/roberta-large-wanli"
+            "Joelzhang/deberta-v3-large-snli_mnli_fever_anli_R1_R2_R3-nli"
         ]
 
         self.device = f"cuda:{local_rank}"
@@ -145,6 +163,7 @@ class NLIEnsembleFilter:
         self.models = {}
         self.cache = cache
         self.mode = mode
+        self.global_counter = 0
 
         for name in self.hf_model_names:
             tokenizer = AutoTokenizer.from_pretrained(name)
@@ -163,7 +182,7 @@ class NLIEnsembleFilter:
             return_tensors="pt",
             truncation=True,
             padding=True,
-            max_length=256,
+            # max_length=256,
             return_token_type_ids=False
         )
         input_seq_pair = input_seq_pair.to(self.device)
@@ -173,7 +192,7 @@ class NLIEnsembleFilter:
             return_tensors="pt",
             truncation=True,
             padding=True,
-            max_length=256,
+            # max_length=256,
             return_token_type_ids=False
         )
         counter_seq_pair = counter_seq_pair.to(self.device)
@@ -202,16 +221,7 @@ class NLIEnsembleFilter:
         counter = torch.sum(torch.mul(preds_counter, new_label_ids) -
                             torch.mul(preds, new_label_ids), -1)
 
-        kl_loss = KLDivLoss(reduction="batchmean", log_target=True)
-
-        divergencies = []
-        for (logit, logit_inv) in zip(natural, counter):
-            logit = log_softmax(logit, dim=-1)
-            logit_inv = softmax(logit_inv, dim=-1)
-            diverge = kl_loss(logit, logit_inv)
-            divergencies.append(diverge)
-
-        return natural, counter, divergencies
+        return natural, counter
 
     def ensemble(self, scores, mode="softmax"):
         if (mode == "softmax"):
@@ -250,34 +260,46 @@ class NLIEnsembleFilter:
                 record["new_premise"] = batch_counter[i][0]
             else:
                 record["new_hypothesis"] = batch_counter[i][0]
-            record["accept"] = counter_data["accept"][i].item()
+
+            # record["accept"] = counter_data["accept"][i].item()
             self.cache.set(guid, json.dumps(record))
-            filtered_data.append(record)
+
+            if record["accept"]:
+                filtered_data.append(record)
         return filtered_data
 
-    def filter(self, counter_data, threshold=0.5, mode="counter"):
+    def filter(self, counter_data, threshold=0.5):
         batch, batch_counter, label, to_label = self.preprocess_batch(
             counter_data)
 
-        y_probs = []
-        y_trues = []
+        scores1 = []
+        scores2 = []
+
         for model_name in self.hf_model_names:
             preds, counter_preds = self.predict(
                 batch, batch_counter, model_name)
             prev_label_ids, new_label_ids = self.encode_label(
                 label, to_label)
-            prob = torch.softmax(counter_preds, dim=1)
-            y_probs.append(prob)
-            y_trues = torch.argmax(new_label_ids, dim=1)
+            score = self.critic_metric(preds, counter_preds,
+                                       prev_label_ids, new_label_ids)
+            scores1.append(score[0])
+            scores2.append(score[1])
 
-        y_probs = torch.stack(y_probs, 0)
-        y_voting = torch.sum(y_probs, axis=0)
-        y_preds = torch.argmax(y_voting, axis=-1).to("cpu").numpy().tolist()
-        y_trues = y_trues.to("cpu").numpy().tolist()
+        voting1 = self.ensemble(torch.stack(
+            scores1, -1)).to("cpu").numpy().tolist()
+        voting2 = self.ensemble(torch.stack(
+            scores2, -1)).to("cpu").numpy().tolist()
 
-        for i, (out, label) in enumerate(zip(y_preds, y_trues)):
-            if out == label:
-                counter_data["accept"][i] = True
+        for i, s in enumerate(zip(voting1, voting2)):
+            guid = counter_data["guid"][i]
+            record = json.loads(self.cache.get(guid))
+            record["score"] = s[1]
+            if s[1] > threshold / 2:  # and s[1] > s[0]:
+                self.global_counter += 1
+                record["accept"] = True
+            else:
+                record["accept"] = False
+            self.cache.set(guid, json.dumps(record))
 
         return self.post_process_batch(counter_data, batch_counter)
 

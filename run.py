@@ -4,6 +4,7 @@ import openai
 import redis
 import argparse
 import logging
+import transformers
 
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
@@ -34,6 +35,8 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
+
+transformers.logging.set_verbosity_error()
 
 openai.organization = organization_token
 
@@ -103,12 +106,12 @@ if __name__ == '__main__':
 
     args.lable = label
     args.to_label = to_label
-    args.generate = True
+    args.generate = False
 
     if args.dataset == "snli":
         args.data_pth = f"./data/input/{args.dataset}/{label}_spans.jsonl"
     else:
-        args.data_pth = f"./data/input/{args.dataset}/{label}.jsonl"
+        args.data_pth = f"./data/input/{args.dataset}/{label}_spans.jsonl"
     args.demo_pth = f"{args.demo_dir}/{args.dataset}/{label}_{to_label}.jsonl"
     args.out_pth = f"{args.out_dir}/{args.dataset}_{label}_{to_label}_{args.start}_{args.end}.jsonl"
 
@@ -133,18 +136,26 @@ if __name__ == '__main__':
 
     alien_counter_data = []
     if args.generate:
-        counter_data = prompt_function[args.gen_type](args, cache, encoder)
+        if args.type == "n2e":
+            counter_data = prompt_function["insertion"](args, cache, encoder)
+        else:
+            counter_data = prompt_function[args.gen_type](args, cache, encoder)
+
     else:
         counter_data = []
         for key in cache.keys():
             record = json.loads(cache[key])
+            # if record["accept"]:
             record[f"new_{args.mode}"] = record[args.mode].replace(
                 record["span_prev"], record["gen_out"]
             )
+            record["score"] = 0.0
+
             if args.gen_type == "insertion" and "prompt" in record:
                 alien_counter_data.append(record)
             else:
                 counter_data.append(record)
+
     logger.info(f"Filtering {len(counter_data)} counterfactuals")
 
     heuristic_filter = AutomaticHeuristicFilter()
@@ -168,18 +179,22 @@ if __name__ == '__main__':
 
     accepted_batch = [
         record for record in filtered_batch if record["accept"]]
-    logger.info(f"Accepted {len(accepted_batch)} counterfactuals")
+    logger.info(
+        f"NLI filter accepted {nli_filter.global_counter} counterfactuals")
 
-    logger.info("Filtering through Perplexity Filter ...")
-    p_filtered = ppl_filter.run(
-        accepted_batch, cache, args.mode, threshold=150)
+    # logger.info("Filtering through Perplexity Filter ...")
+    # p_filtered = ppl_filter.run(
+    #     accepted_batch, cache, args.mode, threshold=150)
+    # logger.info(f"PPL filter accepted {len(p_filtered)} counterfactuals")
 
-    artifact = wandb.Artifact(
-        f"{args.dataset}_{label}_{to_label}_{args.start}_{args.end}",
-        type='dataset'
-    )
-    artifact.add_file(args.out_pth)
-    runner.log_artifact(artifact)
+    if args.generate:
+        write_jsonl(accepted_batch, args.out_pth)
+        artifact = wandb.Artifact(
+            f"{args.dataset}_{label}_{to_label}_{args.start}_{args.end}",
+            type='dataset'
+        )
+        artifact.add_file(args.out_pth)
+        runner.log_artifact(artifact)
 
     accepted, rejected = collect_accepted(cache)
     logger.info(f"Number of total accepted data: {len(accepted)}")

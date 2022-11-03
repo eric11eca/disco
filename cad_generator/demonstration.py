@@ -12,7 +12,7 @@ from .base import (
     label_map,
 )
 
-from counterfactual_filter import read_jsonl, write_jsonl
+from .utils import read_jsonl
 
 
 def mean_pooling(model_output, attention_mask):

@@ -52,6 +52,7 @@ def prompt_perturbation_insertion(args, cache, encoder=None):
 
             output = response['choices'][0]['text'].replace("\n", "").strip()
             record["gen_out"] = output
+            record["score"] = 0.0
             record[f"new_{args.mode}"] = record[args.mode].replace(
                 record["span_prev"], output
             )
@@ -115,8 +116,9 @@ def prompt_perturbation(args, cache, encoder=None):
                 presence_penalty=0.5
             )
 
-            output = response['choices'][0]['text'].replace("\n", "").strip()
-            record["gen_out"] = output
+            output = response['choices'][0]['text']
+            output = output.replace("\n", "").strip()
+            record["gen_out"] = output.replace(".", "")
             record[f"new_{args.mode}"] = record[args.mode].replace(
                 record["span_prev"], output
             )
