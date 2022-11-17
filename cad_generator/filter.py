@@ -21,6 +21,8 @@ from .base import (
     FilterDataset
 )
 
+from .db import update, query
+
 
 class AutomaticHeuristicFilter:
     def _strip_punctuation_and_casing(self, s):
@@ -86,7 +88,7 @@ class AutomaticHeuristicFilter:
             blocked, reason = self.heuristic_filtering(record, mode)
             if blocked:
                 record["accept"] = False
-                cache.set(record['guid'], json.dumps(record))
+                update(cache, {"guid": record["guid"]}, {"$set": {"accept": False}})
                 discards[reason] += 1
             else:
                 accepted.append(record)
@@ -255,15 +257,7 @@ class NLIEnsembleFilter:
         filtered_data = []
         for i in range(len(batch_counter)):
             guid = counter_data["guid"][i]
-            record = json.loads(self.cache.get(guid))
-            if self.mode == "premise":
-                record["new_premise"] = batch_counter[i][0]
-            else:
-                record["new_hypothesis"] = batch_counter[i][0]
-
-            # record["accept"] = counter_data["accept"][i].item()
-            self.cache.set(guid, json.dumps(record))
-
+            record = query(self.cache, {"guid": guid})
             if record["accept"]:
                 filtered_data.append(record)
         return filtered_data
@@ -292,15 +286,20 @@ class NLIEnsembleFilter:
 
         for i, s in enumerate(zip(voting1, voting2)):
             guid = counter_data["guid"][i]
-            record = json.loads(self.cache.get(guid))
-            record["score"] = s[1]
+            record = query(self.cache, {"guid": guid})
+
             if s[1] > threshold / 2:  # and s[1] > s[0]:
                 self.global_counter += 1
-                record["accept"] = True
+                accepted = True
             else:
-                record["accept"] = False
-            self.cache.set(guid, json.dumps(record))
+                accepted = False
 
+            update(
+                self.cache, 
+                {"guid": record["guid"]}, 
+                {"$set": {"accept": accepted, "score": s[1]}}
+            )
+            
         return self.post_process_batch(counter_data, batch_counter)
 
 
@@ -308,8 +307,9 @@ def collect_accepted(cache):
     accepted = []
     rejected = []
 
-    for guid in cache.keys():
-        record = json.loads(cache.get(guid))
+    cursor = list(cache.find({}))
+    for record in tqdm(cursor):
+        del record["_id"]
         if record["accept"]:
             accepted.append(record)
         else:

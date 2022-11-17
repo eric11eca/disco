@@ -17,6 +17,7 @@ from cad_generator.base import (
 )
 
 from cad_generator.api import api_token, organization_token
+from cad_generator.db import get_database
 
 from cad_generator.generator import (
     prompt_perturbation,
@@ -106,7 +107,7 @@ if __name__ == '__main__':
 
     args.lable = label
     args.to_label = to_label
-    args.generate = False
+    args.generate = True
 
     if args.dataset == "snli":
         args.data_pth = f"./data/input/{args.dataset}/{label}_spans.jsonl"
@@ -120,7 +121,7 @@ if __name__ == '__main__':
     else:
         args.mode = "premise"
 
-    cache = get_cache(args)
+    cache = get_database(args.dataset)
 
     if args.prompt_search:
         encoder = SentenceTransformer(args.encoder_name)

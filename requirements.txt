@@ -5,4 +5,5 @@ openai
 wandb
 redis
 torch
+pymongo
 sentence-transformers==2.2.2

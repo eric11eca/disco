@@ -1,9 +1,9 @@
-import json
 import random
 
 from tqdm import tqdm
 from .base import label_map_insert
 from .utils import read_jsonl
+from .db import query, insert
 
 
 def build_problems(args, cache):
@@ -49,21 +49,21 @@ def build_problems(args, cache):
                 "accept": False
             }
 
-            # if cache.exists(guid) > 0:
-            #     record = json.loads(cache.get(guid))
-            #     if not record["accept"]:
-            #         problems.append({
-            #             "premise": premise,
-            #             "hypothesis": hypothesis
-            #         })
-            #         guids.append(guid)
-            # else:
-            cache.set(guid, json.dumps(probelm))
-            problems.append({
-                "premise": premise,
-                "hypothesis": hypothesis
-            })
-            guids.append(guid)
+            record = query(cache, {"guid": guid})
+            if record is not None:
+                if not record["accept"]:
+                    problems.append({
+                        "premise": premise,
+                        "hypothesis": hypothesis
+                    })
+                    guids.append(guid)
+            else:
+                insert(cache, probelm)
+                problems.append({
+                    "premise": premise,
+                    "hypothesis": hypothesis
+                })
+                guids.append(guid)
 
     return guids, problems
 
@@ -120,8 +120,8 @@ def build_problems_insertion(args, cache):
                 "accept": False
             }
 
-            if cache.exists(guid) > 0:
-                record = json.loads(cache.get(guid))
+            record = query(cache, {"guid": guid})
+            if record is not None:
                 if not record["accept"]:
                     problems.append({
                         "premise": premise,
@@ -129,11 +129,12 @@ def build_problems_insertion(args, cache):
                     })
                     guids.append(guid)
             else:
-                cache.set(guid, json.dumps(probelm))
+                insert(cache, probelm)
                 problems.append({
                     "premise": premise,
                     "hypothesis": hypothesis
                 })
                 guids.append(guid)
+
 
     return guids, problems
