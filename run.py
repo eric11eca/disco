@@ -75,7 +75,7 @@ if __name__ == '__main__':
                         help="output directory")
     parser.add_argument('--filter_dir', type=str, default="./data/filtered",
                         help="filtered output directory")
-    parser.add_argument('--dataset', type=str, default="snli",
+    parser.add_argument('--dataset', type=str, default="snli_hard",
                         help="base dataset for conterfactual generation")
     parser.add_argument('--demo_dir', type=str, default="./data/examples",
                         help="demonstration directory")
@@ -121,7 +121,7 @@ if __name__ == '__main__':
     else:
         args.mode = "premise"
 
-    cache = get_database(args.dataset)
+    cache = get_database(args.dataset, args.type)
 
     if args.prompt_search:
         encoder = SentenceTransformer(args.encoder_name)
@@ -144,8 +144,8 @@ if __name__ == '__main__':
 
     else:
         counter_data = []
-        for key in cache.keys():
-            record = json.loads(cache[key])
+        cursor = list(cache.find({}))
+        for record in tqdm(cursor):
             # if record["accept"]:
             record[f"new_{args.mode}"] = record[args.mode].replace(
                 record["span_prev"], record["gen_out"]
@@ -202,7 +202,7 @@ if __name__ == '__main__':
     logger.info(f"Number of total rejected data: {len(rejected)}")
 
     accepted_path = f"./data/filtered/{args.dataset}/{args.type}_{args.gen_type}.jsonl"
-    write_jsonl(accepted, accepted_path)
+    write_jsonl(accepted, accepted_path, mode="a")
     artifact = wandb.Artifact(
         f"{args.dataset}_{args.type}_{args.gen_type}",
         type='dataset'
