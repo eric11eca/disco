@@ -1,17 +1,12 @@
+import os
 import json
+import yaml
+import logging
 
-# e2c = read_jsonl("./data/e2c-exp.jsonl")
-# r_cache = redis.Redis(host='localhost', port=6379, db=0)
-
-
-# keys = []
-# for data in e2c:
-#     keys.append(data['premise'])
-
-# for guid in r_cache.keys():
-#     record = json.loads(r_cache.get(guid))
-#     if record['premise'] in keys:
-#         r_cache.delete(guid)
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s", level=logging.INFO
+)
+logger = logging.getLogger("cad_generator.util")
 
 
 def to_jsonl(data):
@@ -24,7 +19,6 @@ def write_file(data, path, mode="w", **kwargs):
 
 
 def read_jsonl(path, mode="r", **kwargs):
-    # Manually open because .splitlines is different from iterating over lines
     ls = []
     with open(path, mode, **kwargs) as f:
         for line in f:
@@ -36,3 +30,18 @@ def write_jsonl(data, path, mode="w"):
     assert isinstance(data, list)
     lines = [to_jsonl(elem) for elem in data]
     write_file("\n".join(lines) + "\n", path, mode=mode)
+
+
+def read_from_yaml_file(dataset_name):
+    """
+    Reads a file containing a prompt collection.
+    """
+    yaml_path = f"./template/{dataset_name}"
+    if not os.path.exists(yaml_path):
+        logging.warning(
+            f"Tried instantiating `DatasetTemplates` for {dataset_name}, but no prompts found. "
+            "Please ignore this warning if you are creating new prompts for this dataset."
+        )
+        return {}
+    yaml_dict = yaml.load(open(yaml_path, "r"), Loader=yaml.FullLoader)
+    return yaml_dict

@@ -8,17 +8,17 @@ from tqdm import tqdm
 from evaluate import load
 from pprint import pprint
 from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
 
 from transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification
 )
 
-from .base import (
+from .api import (
     label2id,
     forbidden_phrases,
-    negation_words,
-    FilterDataset
+    negation_words
 )
 
 from .db import update, query
@@ -88,7 +88,8 @@ class AutomaticHeuristicFilter:
             blocked, reason = self.heuristic_filtering(record, mode)
             if blocked:
                 record["accept"] = False
-                update(cache, {"guid": record["guid"]}, {"$set": {"accept": False}})
+                update(cache, {"guid": record["guid"]}, {
+                       "$set": {"accept": False}})
                 discards[reason] += 1
             else:
                 accepted.append(record)
@@ -184,7 +185,7 @@ class NLIEnsembleFilter:
             return_tensors="pt",
             truncation=True,
             padding=True,
-            # max_length=256,
+            max_length=128,
             return_token_type_ids=False
         )
         input_seq_pair = input_seq_pair.to(self.device)
@@ -194,7 +195,7 @@ class NLIEnsembleFilter:
             return_tensors="pt",
             truncation=True,
             padding=True,
-            # max_length=256,
+            max_length=128,
             return_token_type_ids=False
         )
         counter_seq_pair = counter_seq_pair.to(self.device)
@@ -295,11 +296,11 @@ class NLIEnsembleFilter:
                 accepted = False
 
             update(
-                self.cache, 
-                {"guid": record["guid"]}, 
+                self.cache,
+                {"guid": record["guid"]},
                 {"$set": {"accept": accepted, "score": s[1]}}
             )
-            
+
         return self.post_process_batch(counter_data, batch_counter)
 
 
@@ -316,3 +317,14 @@ def collect_accepted(cache):
             rejected.append(record)
 
     return accepted, rejected
+
+
+class FilterDataset(Dataset):
+    def __init__(self, counter_data):
+        self.counter_data = counter_data
+
+    def __getitem__(self, index):
+        return self.counter_data[index]
+
+    def __len__(self):
+        return len(self.counter_data)
