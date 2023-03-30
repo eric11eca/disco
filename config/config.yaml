@@ -1,0 +1,29 @@
+paths:
+  out_dir: ./data/output                # output directory
+  filter_dir: ./data/filtered           # filtered output directory
+  demo_dir: ./data/examples             # demonstration directory
+
+generator_params:
+  gen_type: completion                  # gpt-3 generation mode: completion | insertion | chat
+  dataset: snli_hard                    # base dataset for conterfactual generation
+  start: 0                              # start position of the dataset for the current batch
+  end: 1000                             # end position of the dataset for the current batch
+  type: e2c                             # type of counterfactual: e2c | c2e | e2n | c2n
+  template: masked_cad_premise          
+
+search_params: 
+  num_neighbors: 8                      # number of nearest neighbors
+  embed_type: CLS                       # type of embedding method
+  metric: euclidean                     # distance metric used for nearest neighbor
+  encoder_name: roberta-large-nli-mean-tokens    # "name of the encoder for sentence embedding
+  prompt_search: True                   # enable dynamically selecting demonstrations
+
+util_params:
+  local_rank: 0                         # locak rank of cuda devices
+  api_idx: 0                            # api index if multiple api tokens
+
+wandb_params:
+  project: gpt3-counterfactual-generation
+  entity: causal_scaffold
+  name: gpt_generation_logger
+  

@@ -1,0 +1,53 @@
+dataset: anli
+templates:
+  masked_cad_premise:
+    mode: sentence1
+    answer_choices:
+      entailment: "true"
+      neutral: "iconclusive"
+      contradiction: "false"
+    instruction: "Given the statement and what you know about the
+      world, complete the conclusion (fill in the blank) so that the conclusion is {{answer_choices[label]}} based on the statement.
+      Do not repeat the conclusion, be creative."
+    template: "statement: {{sentence1.replace(span, '[blank]')}} \nconclusion: {{sentence2}} \n[blank] should be"
+    template_insert: "Given a statement {{sentence1.replace(span, '[insert]')}}, it is {{ answer_choices[label] }} that {{sentence2}}"
+    name: statement-conclusion-true
+
+  masked_cad_hypothesis:
+    mode: sentence2
+    answer_choices:
+      entailment: "true"
+      neutral: "iconclusive"
+      contradiction: "false"
+    instruction: "Given the statement and what you know about the
+      world, complete the conclusion (fill in the blank) so that the conclusion is {{answer_choices[label]}} based on the statement.
+      Do not repeat the conclusion, be creative."
+    template: "statement: {{sentence1}} \nconclusion: {{sentence2.replace(span, '[blank]')}} \n[blank] should be"
+    template_insert: "Given a statement {{sentence1}}, it is {{ answer_choices[label] }} that {{sentence2.replace(span, '[insert]')}}"
+    name: statement-conclusion-true
+
+  gen_premise:
+    mode: sentence1
+    answer_choices:
+      entailment: "true"
+      neutral: "iconclusive"
+      contradiction: "false"
+    instruction: "Given the conclusion and what you know about the
+      world, generate a statement so that the conclusion is {{answer_choices[label]}} based on the generated statement.
+      Do not repeat the conclusion, be creative."
+    template: "conclusion: {{sentence2}} \nstatement:"
+    template_insert: "Given a statment [insert], it is {{ answer_choices[label] }} that {{sentence2}}"
+    name: conclusion-statement-true
+
+  gen_hypothesis:
+    mode: sentence2
+    answer_choices:
+      entailment: "true"
+      neutral: "iconclusive"
+      contradiction: "false"
+    instruction: "Given the statement and what you know about the
+      world, generate a conclusion so that the generated conclusion is {{answer_choices[label]}} based on the statement.
+      Do not repeat the conclusion, be creative."
+    template: "nstatement: {{sentence1}} \nconclusion:"
+    template_insert: "Given a statement {{sentence1}}, it is {{ answer_choices[label] }} that [insert]"
+    name: conclusion-statement-true
