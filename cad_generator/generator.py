@@ -1,26 +1,9 @@
-import json
 import openai
-import random
 import logging
 
 from torch.utils.data import DataLoader
+from cad_generator.db import update
 
-from .base import (
-    Example,
-    Prompt
-)
-
-from .demonstration import (
-    build_masked_nli_perturbation,
-    demonstration_search
-)
-
-from .prompt import (
-    build_problems,
-    build_problems_insertion
-)
-
-from .db import query, update
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s", level=logging.INFO
@@ -28,130 +11,115 @@ logging.basicConfig(
 logger = logging.getLogger("cad_generator.generator")
 
 
-def prompt_perturbation_insertion(args, cache, encoder=None):
-    generation_outputs = []
+class Generator:
+    def __init__(self, args, cache):
+        self.args = args
+        self.cache = cache
+        self.generation_outputs = []
 
-    logger.info("Build prompt: enumerate problems")
-    guids, problems = build_problems_insertion(args, cache)
+        self.generation_modes = {
+            "completion": self.completion,
+            "insertion": self.insertion,
+            "chat": self.chat
+        }
 
-    logger.info(f"Querying {len(problems)} problems from DB ...")
-    dataloader = DataLoader(guids, batch_size=200, shuffle=False)
+        self.num_records = 0
 
-    logger.info(f"Prompting {len(problems)} problems ...")
-    for i, batch_id in enumerate(dataloader):
-        batch = [query(cache, {"guid": guid}) for guid in batch_id]
-        for record in batch:    
+    def preprocess(self, records):
+        logger.info(f"Querying {len(records)} problems from DB ...")
+        dataloader = DataLoader(
+            records, batch_size=100, shuffle=False, collate_fn=lambda x: x)
+
+        self.dataloader = dataloader
+        self.num_records = len(records)
+
+    def insertion(self, prompt):
+        response = openai.Completion.create(
+            model="text-davinci-003",
+            prompt=prompt['prefix'],
+            suffix=prompt['suffix'],
+            temperature=0.8,
+            max_tokens=256,
+            top_p=1.0,
+            frequency_penalty=0.8,
+            presence_penalty=0.5,
+            stop=["stop", "\n", "."]
+        )
+        return response
+
+    def completion(self, prompt):
+        response = openai.Completion.create(
+            engine="text-davinci-003",
+            prompt=prompt,
+            top_p=1.0,
+            temperature=0.8,
+            max_tokens=256,
+            frequency_penalty=0.8,
+            presence_penalty=0.5
+        )
+        return response
+
+    def chat(self, prompt):
+        messages = [{"role": "system", "content": prompt['instruction']}]
+        for example in prompt['examples']:
+            messages.append(
+                {"role": "user", "content": example.text_input})
+            messages.append(
+                {"role": "assistant", "content": example.text_output})
+        messages.append({"role": "user", "content": prompt['problem']})
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=messages
+        )
+        return response
+
+    def postprocess(self, response, record):
+        output = response['choices'][0]['text']
+        output = output.replace("\n", "").strip()
+        record["gen_out"] = output
+        new_input = record[self.args.mode].replace(
+            record["span_prev"], output)
+        record[f"new_{self.args.mode}"] = new_input
+        return record
+
+    def batch_generate(self, records):
+        self. preprocess(records)
+
+        logger.info(f"Prompting {len(self.problems)} problems ...")
+        generation_outputs = []
+
+        for _, batch in enumerate(self.dataloader):
+            batch_outputs = self.generate(batch)
+            logger.info(
+                f"Writing {len(batch_outputs)} generation into DB ...")
+
+            for record in batch_outputs:
+                update(self.cache, {"guid": record["guid"]}, {
+                    "$set": {
+                        "gen_out": record["gen_out"],
+                        "score": 0.0,
+                        f"new_{self.args.mode}": record[f"new_{self.args.mode}"]
+                    }})
+
+            generation_outputs.extend(batch_outputs)
+
+        logger.info(f"Receiving {len(generation_outputs)} generation outputs")
+        return generation_outputs
+
+    def generate(self, batch):
+        batch_generation_outputs = []
+        for record in batch:
             if record is None:
                 logger.info("Warning: record not found, skipping ...")
                 continue
-
-            if not record["accept"]:
-                response = openai.Completion.create(
-                    model="text-davinci-002",
-                    prompt=record['prefix'],
-                    suffix=record['suffix'],
-                    temperature=0.8,
-                    max_tokens=256,
-                    top_p=1,
-                    frequency_penalty=0.8,
-                    presence_penalty=0.5,
-                    stop=["stop", "\n", "."]
-                )
-
-                output = response['choices'][0]['text'].replace("\n", "").strip()
-                record["gen_out"] = output
-                new_input = record[args.mode].replace(record["span_prev"], output)
-                record[f"new_{args.mode}"] = new_input
-                generation_outputs.append(record)
-
-        logger.info(f"Writing {len(generation_outputs)} generation into DB ...")    
-        for record in generation_outputs:
-            update(cache, {"guid": record["guid"]}, {
-                "$set":{
-                    "gen_out": record["gen_out"],
-                    "score": 0.0,
-                    f"new_{args.mode}": record[f"new_{args.mode}"]
-            }})
-
-    logger.info(f"Receiving {len(generation_outputs)} generation outputs")
-    return generation_outputs
-
-def prompt_perturbation(args, cache, encoder=None):
-    generation_outputs = []
-
-    logger.info("Build prompt: sample demonstrations")
-    instruction, perturbations = build_masked_nli_perturbation(args)
-
-    logger.info(f"Prompting Instruction: {instruction}")
-    random.shuffle(perturbations)
-
-    logger.info("Build prompt: enumerate problems")
-    guids, problems = build_problems(args, cache)
-    gpt_prompt = Prompt()
-
-    if args.prompt_search:
-        examples_selected = demonstration_search(
-            args, perturbations, problems, encoder)
-
-        assert len(examples_selected) == len(problems)
-
-    logger.info("Build prompt: enumerate problems")
-    guids, problems = build_problems_insertion(args, cache)
-
-    logger.info(f"Querying {len(problems)} problems from DB ...")
-    dataloader = DataLoader(guids, batch_size=200, shuffle=False)
-
-    logger.info(f"Prompting {len(problems)} problems ...")
-    for i, batch_id in enumerate(dataloader):
-        batch = [query(cache, {"guid": guid}) for guid in batch_id]
-        for record in batch:    
-            if record is None:
-                logger.info("Warning: record not found, skipping ...")
+            if record["accept"]:
+                logger.info("Warning: accepted record, skipping ...")
                 continue
 
-            if not record["accept"]:
-                if args.prompt_search:
-                    examples = [perturbations[j] for j in examples_selected[i]]
-                    examples.reverse()
-                else:
-                    random.shuffle(perturbations)
-                    examples = perturbations[:args.num_neighbors]
-
-                gpt_prompt.delete_all_examples()
-                for example in examples:
-                    demonstration = Example(example["prompt"], example["output"])
-                    gpt_prompt.add_example(demonstration)
-
-                prompt = gpt_prompt.craft_query(
-                    record['prompt'],
-                    instruction=instruction
-                )
-
-                response = openai.Completion.create(
-                    engine="text-davinci-002",
-                    prompt=prompt,
-                    top_p=1.0,
-                    temperature=0.8,
-                    max_tokens=256,
-                    frequency_penalty=0.8,
-                    presence_penalty=0.5
-                )
-
-                output = response['choices'][0]['text']
-                output = output.replace("\n", "").strip()
-                record["gen_out"] = output
-                new_input = record[args.mode].replace(record["span_prev"], output)
-                record[f"new_{args.mode}"] = new_input
-                generation_outputs.append(record)
-
-        logger.info(f"Writing {len(generation_outputs)} generation into DB ...")    
-        for record in generation_outputs:
-            update(cache, {"guid": record["guid"]}, {
-                "$set":{
-                    "gen_out": record["gen_out"],
-                    "score": 0.0,
-                    f"new_{args.mode}": record[f"new_{args.mode}"]
-            }})
-
-    logger.info(f"Receiving {len(generation_outputs)} generation outputs")
-    return generation_outputs
+            generator = self.generation_modes.get(self.args.gen_type, None)
+            if generator is None:
+                raise NotImplementedError("Unknown Generation Mode")
+            response = generator(record['query'])
+            updated_record = self.postprocess(response, record)
+            batch_generation_outputs.append(updated_record)
+        return batch_generation_outputs
