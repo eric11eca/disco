@@ -133,26 +133,24 @@ class BaseExampleReader:
         return prompt
 
     @staticmethod
-    def _read(instance, args):
+    def _read(instance):
         """Reads a single json line from the target file. Modify here when the json schema changes
 
         :param instance: the instance to be read
-        :param args: the configuration arguments
         :rtype instance: situation_modeling.readers.input_example.InputBase
         """
         NotImplemented
 
     @classmethod
-    def jsonl_file_reader(cls, instances, config):
+    def jsonl_file_reader(cls, instances):
         """The method responsible for parsing in the input file. Implemented here
         to make the overall pipeline more transparent.
 
         :param instances: instances to be processed for perturbation
-        :param config: the configuration
         """
         demonstrations = []
         for instance in instances:
-            demonstration = cls._read(instance, config)
+            demonstration = cls._read(instance)
             demonstrations.append(demonstration)
         return demonstrations
     

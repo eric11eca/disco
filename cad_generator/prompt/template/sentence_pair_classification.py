@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
 
 from cad_generator.prompt.core import (
@@ -8,6 +8,9 @@ from cad_generator.prompt.core import (
     BaseExampleReader,
 )
 
+from cad_generator.utils import read_jsonl
+from cad_generator.db import get_database
+
 
 @dataclass
 class SentencePairPrompt(BasePrompt):
@@ -16,12 +19,12 @@ class SentencePairPrompt(BasePrompt):
     sentence2: str
     label: str
     new_label: str
-    sentence1_spans: List[str]
-    sentence2_spans: List[str]
+    sentence1_spans: Optional[List[str]]
+    sentence2_spans: Optional[List[str]]
     prompt: str
-    prefix: str
-    suffix: str
-    span_prev: str
+    prefix: Optional[str]
+    suffix: Optional[str]
+    span_prev: Optional[str]
     gen_out: str
     score: float
     accept: bool
@@ -59,11 +62,10 @@ class SentencePairExample(BaseExample):
 
 class SentencePairExampelReader(BaseExampleReader):
     @ staticmethod
-    def _read(instance, args):
+    def _read(instance):
         """Reads a single json line from the target file. Modify here when the json schema changes
 
         :param instance: the instance to be read
-        :param args: the configuration arguments
         :rtype instance: situation_modeling.readers.input_example.InputBase
         """
         guid = instance["guid"]
@@ -82,8 +84,9 @@ class SentencePairComposer(BaseComposer):
         template,
         template_insert,
         instance,
-        span, answer_choices,
-        span_idx,
+        span, 
+        answer_choices,
+        prompt_idx,
     ):
         guid = instance["guid"]
         sentence1 = instance["sentence1"]
@@ -91,25 +94,28 @@ class SentencePairComposer(BaseComposer):
         label = instance["label"]
         new_label = instance["new_label"]
 
+        render_items = {
+            "sentence1": sentence1,
+            "sentence2": sentence2,
+            "span": span,
+            "label": new_label,
+            "answer_choices": answer_choices
+        }
+
         prompt = SentencePairComposer._compose_prompt(
-            template,
-            {"sentence1": sentence1,
-             "sentence2": sentence2,
-             "span": span},
+            template=template,
+            render_items=render_items
         )
+
         prompt_insert = SentencePairComposer._compose_prompt(
-            template_insert,
-            {"sentence1": sentence1,
-             "sentence2": sentence2,
-             "span": span,
-             "label": new_label,
-             "answer_choices": answer_choices}
+            template=template_insert,
+            render_items=render_items
         )
         prefix = prompt_insert.split("[insert]")[0]
         suffix = prompt_insert.split("[insert]")[1]
 
         prompt_instance = SentencePairPrompt(
-            guid=f"{guid}spanid={span_idx}",
+            guid=f"{guid}-id={prompt_idx}",
             sentence1=sentence1,
             sentence2=sentence2,
             label=label,
@@ -177,3 +183,21 @@ class SentencePairComposer(BaseComposer):
             record for record in seed_records if not record["accept"]]
 
         return seed_records
+
+
+def main():
+    cache = get_database(
+        dataset="snli",
+        type="masked_cad_premise"
+    )
+
+    example_reader = SentencePairExampelReader
+
+    input_file = "data/snli/input/neutral.jsonl"
+    input_instances = read_jsonl(input_file)
+    examples = example_reader.jsonl_file_reader(input_instances)
+    print(examples)
+
+if __name__ == "__main__":
+    main()
+
