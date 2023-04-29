@@ -51,3 +51,13 @@ templates:
     template: "nstatement: {{sentence1}} \nconclusion:"
     template_insert: "Given a statement {{sentence1}}, it is {{ answer_choices[label] }} that [insert]"
     name: conclusion-statement-true
+  
+  gen_sample:
+    mode: sentences
+    answer_choices:
+      entailment: "true"
+      neutral: "iconclusive"
+      contradiction: "false"
+    instruction: "Given what you know about the world, generate a statement and a conclusion so that the generated conclusion is {{answer_choices[label]}} based on the statement.
+      Do not repeat the example I provided, be creative."
+    template: "output:"
