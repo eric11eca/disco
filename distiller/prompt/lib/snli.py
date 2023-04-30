@@ -1,9 +1,10 @@
-import os
+import random
 
-from hydra import compose, initialize
+from hydra import compose
 
 from distiller.api import GPTQuery
 from distiller.utils import read_jsonl
+from distiller.db import update
 from distiller.prompt.core import labels_to_bimap, Task
 from distiller.prompt.template.sentence_pair_classification import (
     SentencePairPrompt,
@@ -57,7 +58,8 @@ class SNLITask(Task):
     def _craft(record, demonstration, instruction, model):
         gpt_prompt = GPTQuery()
         gpt_prompt.add_instruction(instruction)
-        gpt_prompt.add_example(demonstration)
+        for example in demonstration:
+            gpt_prompt.add_example(example)
         prompt = gpt_prompt.craft_query(record, model)
         return prompt
 
@@ -68,32 +70,46 @@ class SNLITask(Task):
 
     @classmethod
     def build_prompts(cls, args, cache):
-        instances = cls._load_base_data(args)
+        instances = cls._load_base_data(args) 
 
-        template = cls._load_template(
+        templates = cls._load_template(
             cls.TASK, args.template_name)
         
         instruction = cls.Composer._compose_instruction(
-            template.instruction,
+            templates.instruction,
             {
-                "answer_choices": template.answer_choices,
-                "label": args.label
+                "answer_choices": templates.answer_choices,
+                "label": args.target_label
             },
         )
 
         records = cls.Composer.read_and_compose(
-            instances, cache, template)
-        
-        print(records[0])
+            args, cache, instances[:10], templates)
 
         demonstration = cls.ExampleReader.jsonl_file_reader(args.demo_pth)
+        demonstration = random.choices(demonstration, k=4)
 
-        print(demonstration[0])
-
+        querys = []
         for record in records:
-            record.query = cls._craft(
+            query = cls._craft(
                 record,
                 demonstration,
                 instruction,
                 args.gen_type)
-        return records
+            querys.append((record, query))
+        return querys
+    
+    @classmethod
+    def postprocess_generation(cls, cache, generated):        
+        for record in generated:
+            old_data = record.__dict__()[record.mode]
+            span_prev = record.span_prev
+            new_data = old_data.replace(span_prev, record.gen_out)
+            update(cache, {"guid": record.guid}, {
+                "$set": {
+                    "gen_out": record.gen_out,
+                    "score": 0.0,
+                    f"new_{record.mode}": new_data
+                }})
+
+        return generated
