@@ -2,7 +2,7 @@ import openai
 import logging
 
 from torch.utils.data import DataLoader
-from cad_generator.db import update
+from distiller.db import update
 
 
 logging.basicConfig(

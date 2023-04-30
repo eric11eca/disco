@@ -8,11 +8,11 @@ from tqdm import tqdm
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
-from cad_generator.db import get_database
-from cad_generator.utils import write_jsonl
-from cad_generator.prompt.core import Task
-from cad_generator.generator import Generator
-from cad_generator.filter import (
+from distiller.db import get_database
+from distiller.utils import write_jsonl
+from distiller.prompt.core import Task
+from distiller.generator import Generator
+from distiller.filter import (
     NLIEnsembleFilter,
     AutomaticHeuristicFilter,
     PerplexityFilter,

@@ -1,15 +1,15 @@
 from typing import List, Optional
 from dataclasses import dataclass
 
-from cad_generator.prompt.core import (
+from distiller.prompt.core import (
     BasePrompt,
     BaseExample,
     BaseComposer,
     BaseExampleReader,
 )
 
-from cad_generator.utils import read_jsonl
-from cad_generator.db import get_database
+from distiller.utils import read_jsonl
+from distiller.db import get_database
 
 
 @dataclass

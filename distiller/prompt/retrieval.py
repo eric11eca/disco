@@ -1,5 +1,5 @@
-from cad_generator.prompt.core import Task
-from cad_generator.prompt.lib.anli import AdversarialNliTask
+from distiller.prompt.core import Task
+from distiller.prompt.lib.anli import AdversarialNliTask
 
 TASK_DICT = {
     "adversarial_nli": AdversarialNliTask,

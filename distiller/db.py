@@ -9,7 +9,7 @@ def get_database(dataset="snli", type="c2e"):
     """
     CONNECTION_STRING = "localhost:27017"
     client = MongoClient(CONNECTION_STRING)
-    collection = client['counterfactual'][f"{dataset}_{type}"]
+    collection = client['disco'][f"{dataset}_{type}"]
     return collection
 
 def query(collection, query):

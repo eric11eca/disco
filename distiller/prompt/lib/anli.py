@@ -1,9 +1,9 @@
 from hydra import compose, initialize
 
-from cad_generator.api import GPTQuery
-from cad_generator.utils import read_jsonl
-from cad_generator.prompt.core import labels_to_bimap, Task
-from cad_generator.prompt.template.sentence_pair_classification import (
+from distiller.api import GPTQuery
+from distiller.utils import read_jsonl
+from distiller.prompt.core import labels_to_bimap, Task
+from distiller.prompt.template.sentence_pair_classification import (
     SentencePairPrompt,
     SentencePairExample,
     SentencePairComposer,

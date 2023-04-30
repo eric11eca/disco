@@ -1,4 +1,4 @@
-from cad_generator.prompt.core import BaseExample
+from distiller.prompt.core import BaseExample
 
 
 negation_words = [

@@ -7,8 +7,8 @@ import logging
 from enum import Enum
 from jinja2 import BaseLoader, Environment, meta
 
-from cad_generator.db import query, insert
-from cad_generator.prompt.datastructure import BiMap
+from distiller.db import query, insert
+from distiller.prompt.datastructure import BiMap
 
 env = Environment(loader=BaseLoader)
 
