@@ -86,14 +86,14 @@ class SNLITask(Task):
         
         print(records[0])
 
-        demonstration = cls.ExampleReader.read_examples(args)
+        demonstration = cls.ExampleReader.jsonl_file_reader(args.demo_pth)
 
         print(demonstration[0])
 
-        # for record in records:
-        #     record["query"] = cls._craft(
-        #         record,
-        #         demonstration,
-        #         instruction,
-        #         args.gen_type)
-        # return records
+        for record in records:
+            record.query = cls._craft(
+                record,
+                demonstration,
+                instruction,
+                args.gen_type)
+        return records

@@ -1,3 +1,4 @@
+from tqdm import tqdm
 from typing import List, Optional
 from dataclasses import dataclass
 
@@ -8,9 +9,6 @@ from distiller.prompt.core import (
     BaseExampleReader,
 )
 
-from distiller.utils import read_jsonl
-from distiller.db import get_database
-
 
 @dataclass
 class SentencePairPrompt(BasePrompt):
@@ -19,31 +17,37 @@ class SentencePairPrompt(BasePrompt):
     sentence2: str
     label: str
     new_label: str
-    sentence1_spans: Optional[List[str]]
-    sentence2_spans: Optional[List[str]]
     prompt: str
-    prefix: Optional[str]
-    suffix: Optional[str]
-    span_prev: Optional[str]
     gen_out: str
     score: float
     accept: bool
-
+    prefix: Optional[str] = None
+    suffix: Optional[str] = None
+    span_prev: Optional[str] = None
+    sentence1_spans: Optional[List[str]] = None
+    sentence2_spans: Optional[List[str]]= None
+    
     def __dict__(self) -> dict:
-        return {
+        defualt = {
             "guid": self.guid,
             "sentence1": self.sentence1,
             "sentence2": self.sentence2,
             "label": self.label,
             "new_label": self.new_label,
             "prompt": self.prompt,
-            "prefix": self.prefix,
-            "suffix": self.suffix,
-            "span_prev": self.span_prev,
             "gen_out": self.gen_out,
             "score": self.score,
             "accept": self.accept,
         }
+
+        if self.prefix:
+            defualt["prefix"] = self.prefix
+        if self.suffix:
+            defualt["suffix"] = self.suffix
+        if self.span_prev:
+            defualt["span_prev"] = self.span_prev
+
+        return defualt
 
 
 @dataclass
@@ -111,6 +115,7 @@ class SentencePairComposer(BaseComposer):
             template=template_insert,
             render_items=render_items
         )
+        
         prefix = prompt_insert.split("[insert]")[0]
         suffix = prompt_insert.split("[insert]")[1]
 
@@ -131,32 +136,37 @@ class SentencePairComposer(BaseComposer):
         return prompt_instance
 
     @ staticmethod
-    def _read(instance, templates, mode):
+    def _read(instance, templates, target_label):
         """Reads a single json line from the target file. Modify here when the json schema changes
 
         :param instance: the instance to be read
         :param templates: the templates to be used for prompt
+        :param target_label: the target label for the generated data
         :rtype problem: List[SentencePairPrompt]
         """
+        sentence1 = instance["sentence1"]
+        sentence2 = instance["sentence2"]
         sentence1_spans = list(set(instance["sentence1_span"]))
         sentence2_spans = list(set(instance["sentence2_span"]))
-        problems = []
 
         template = templates.template
         template_insert = templates.template_insert
         answer_choices = templates.answer_choices
 
-        if mode == "sentence1":
+        problems = []
+        if templates.mode == "sentence1":
             problems1 = [
                 SentencePairComposer._build_promtp_instance(
-                    template, template_insert, instance, span, answer_choices, i)
-                for i, span in enumerate(sentence1_spans)]
+                    template, template_insert, instance, 
+                    target_label, span, answer_choices, i)
+                for i, span in enumerate(sentence1_spans) if span in sentence1]
             problems.extend(problems1)
-        elif mode == "sentence2":
+        elif templates.mode == "sentence2":
             problems2 = [
                 SentencePairComposer._build_promtp_instance(
-                    template, template_insert, instance, span, answer_choices, i)
-                for i, span in enumerate(sentence2_spans)]
+                    template, template_insert, instance, 
+                    target_label, span, answer_choices, i)
+                for i, span in enumerate(sentence2_spans) if span in sentence2]
             problems.extend(problems2)
         return problems
 
@@ -172,15 +182,17 @@ class SentencePairComposer(BaseComposer):
         mode = templates.mode
         seed_records = []
 
-        for instance in instances:
+        print("Reading and composing prompts...")
+        for instance in tqdm(instances[:100]):
             records = cls._read(instance, templates, mode)
             seed_records.extend(records),
-
-        for record in seed_records:
-            record["accept"] = cls._commit(record, cache)
+        
+        print("Committing prompts...")
+        for record in tqdm(seed_records):
+            record.accept = cls._commit(record, cache)
 
         seed_records = [
-            record for record in seed_records if not record["accept"]]
+            record for record in seed_records if not record.accept]
 
         return seed_records
 

@@ -9,6 +9,7 @@ from jinja2 import BaseLoader, Environment, meta
 
 from distiller.db import query, insert
 from distiller.prompt.datastructure import BiMap
+from distiller.utils import read_jsonl
 
 env = Environment(loader=BaseLoader)
 
@@ -41,7 +42,7 @@ class BasePrompt:
         }
 
     def __str__(self) -> str:
-        return json.dumps(self.__dict__, indent=2)
+        return json.dumps(self.__dict__(), indent=2)
 
 
 class BaseExample:
@@ -58,7 +59,7 @@ class BaseExample:
         }
 
     def __str__(self) -> str:
-        return json.dumps(self.__dict__, indent=2)
+        return json.dumps(self.__dict__(), indent=2)
 
 
 class BaseComposer:
@@ -98,11 +99,11 @@ class BaseComposer:
         :param record: the record to be committed
         :param cache: the database instance
         """
-        db_record = query(cache, {"guid": record["guid"]})
+        db_record = query(cache, {"guid": record.guid})
         if db_record is not None and db_record["accept"]:
             return True
         else:
-            insert(cache, record)
+            insert(cache, record.__dict__())
             return False
 
     @classmethod
@@ -146,13 +147,14 @@ class BaseExampleReader:
         NotImplemented
 
     @classmethod
-    def jsonl_file_reader(cls, instances):
+    def jsonl_file_reader(cls, demo_pth):
         """The method responsible for parsing in the input file. Implemented here
         to make the overall pipeline more transparent.
 
-        :param instances: instances to be processed for perturbation
+        :param demo_pth: the path to the demonstration file
         """
         demonstrations = []
+        instances = read_jsonl(demo_pth)
         for instance in instances:
             demonstration = cls._read(instance)
             demonstrations.append(demonstration)
