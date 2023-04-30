@@ -84,6 +84,7 @@ class SentencePairComposer(BaseComposer):
         template,
         template_insert,
         instance,
+        new_label,
         span, 
         answer_choices,
         prompt_idx,
@@ -91,8 +92,7 @@ class SentencePairComposer(BaseComposer):
         guid = instance["guid"]
         sentence1 = instance["sentence1"]
         sentence2 = instance["sentence2"]
-        label = instance["label"]
-        new_label = instance["new_label"]
+        label_curr = instance["label"]
 
         render_items = {
             "sentence1": sentence1,
@@ -118,7 +118,7 @@ class SentencePairComposer(BaseComposer):
             guid=f"{guid}-id={prompt_idx}",
             sentence1=sentence1,
             sentence2=sentence2,
-            label=label,
+            label=label_curr,
             new_label=new_label,
             prompt=prompt,
             prefix=prefix,
@@ -183,21 +183,4 @@ class SentencePairComposer(BaseComposer):
             record for record in seed_records if not record["accept"]]
 
         return seed_records
-
-
-def main():
-    cache = get_database(
-        dataset="snli",
-        type="masked_cad_premise"
-    )
-
-    example_reader = SentencePairExampleReader
-
-    input_file = "data/snli/examples/contradiction_entailment.jsonl"
-    input_instances = read_jsonl(input_file)
-    examples = example_reader.jsonl_file_reader(input_instances)
-    print(examples)
-
-if __name__ == "__main__":
-    main()
 
