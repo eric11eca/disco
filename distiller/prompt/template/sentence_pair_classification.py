@@ -21,6 +21,7 @@ class SentencePairPrompt(BasePrompt):
     gen_out: str
     score: float
     accept: bool
+    mode: str = None
     prefix: Optional[str] = None
     suffix: Optional[str] = None
     span_prev: Optional[str] = None
@@ -40,12 +41,18 @@ class SentencePairPrompt(BasePrompt):
             "accept": self.accept,
         }
 
+        if self.mode:
+            defualt["mode"] = self.mode
         if self.prefix:
             defualt["prefix"] = self.prefix
         if self.suffix:
             defualt["suffix"] = self.suffix
         if self.span_prev:
             defualt["span_prev"] = self.span_prev
+        if self.sentence1_spans:
+            defualt["sentence1_spans"] = self.sentence1_spans
+        if self.sentence2_spans:
+            defualt["sentence2_spans"] = self.sentence2_spans
 
         return defualt
 
@@ -89,7 +96,8 @@ class SentencePairComposer(BaseComposer):
         template_insert,
         instance,
         new_label,
-        span, 
+        span,
+        mode,
         answer_choices,
         prompt_idx,
     ):
@@ -133,6 +141,10 @@ class SentencePairComposer(BaseComposer):
             score=0.0,
             accept=False,
         )
+
+        if mode != "sentences":
+            prompt_instance.mode = mode
+
         return prompt_instance
 
     @ staticmethod
@@ -158,33 +170,33 @@ class SentencePairComposer(BaseComposer):
             problems1 = [
                 SentencePairComposer._build_promtp_instance(
                     template, template_insert, instance, 
-                    target_label, span, answer_choices, i)
+                    target_label, span, templates.mode, answer_choices, i)
                 for i, span in enumerate(sentence1_spans) if span in sentence1]
             problems.extend(problems1)
         elif templates.mode == "sentence2":
             problems2 = [
                 SentencePairComposer._build_promtp_instance(
                     template, template_insert, instance, 
-                    target_label, span, answer_choices, i)
+                    target_label, span, templates.mode, answer_choices, i)
                 for i, span in enumerate(sentence2_spans) if span in sentence2]
             problems.extend(problems2)
         return problems
 
     @classmethod
-    def read_and_compose(cls, instances, cache, templates):
+    def read_and_compose(cls, args, cache, instances, templates):
         """The method responsible for parsing in the input file. Implemented here
         to make the overall pipeline more transparent.
 
-        :param instances: instances to be processed for perturbation
+        :param args: the arguments passed in from the command line
         :param cache: the database instance
+        :param instances: instances to be processed for perturbation
         :param templates: the templates to be used for prompt
         """
-        mode = templates.mode
         seed_records = []
 
         print("Reading and composing prompts...")
-        for instance in tqdm(instances[:100]):
-            records = cls._read(instance, templates, mode)
+        for instance in tqdm(instances):
+            records = cls._read(instance, templates, args.target_label)
             seed_records.extend(records),
         
         print("Committing prompts...")
