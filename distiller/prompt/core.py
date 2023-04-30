@@ -66,7 +66,7 @@ class BaseComposer:
         self.cache = cache
         self.templates = templates
 
-    @ staticmethod
+    @staticmethod
     def _compose_prompt(template, render_items):
         """Compose a prompt for the sentence pair
            Can be overriden by subclasses
@@ -77,6 +77,10 @@ class BaseComposer:
         """
         prompt = env.from_string(template).render(**render_items)
         return prompt
+    
+    @staticmethod
+    def _compose_instruction(instruction, render_items):
+        return env.from_string(instruction).render(**render_items)
 
     @staticmethod
     def _read(instance, templates):

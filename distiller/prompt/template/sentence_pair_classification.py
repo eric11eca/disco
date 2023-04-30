@@ -60,7 +60,7 @@ class SentencePairExample(BaseExample):
         }
 
 
-class SentencePairExampelReader(BaseExampleReader):
+class SentencePairExampleReader(BaseExampleReader):
     @ staticmethod
     def _read(instance):
         """Reads a single json line from the target file. Modify here when the json schema changes
@@ -138,8 +138,8 @@ class SentencePairComposer(BaseComposer):
         :param templates: the templates to be used for prompt
         :rtype problem: List[SentencePairPrompt]
         """
-        sentence1_spans = list(set(instance["sentence1_spans"]))
-        sentence2_spans = list(set(instance["sentence2_spans"]))
+        sentence1_spans = list(set(instance["sentence1_span"]))
+        sentence2_spans = list(set(instance["sentence2_span"]))
         problems = []
 
         template = templates.template
@@ -191,9 +191,9 @@ def main():
         type="masked_cad_premise"
     )
 
-    example_reader = SentencePairExampelReader
+    example_reader = SentencePairExampleReader
 
-    input_file = "data/snli/input/neutral.jsonl"
+    input_file = "data/snli/examples/contradiction_entailment.jsonl"
     input_instances = read_jsonl(input_file)
     examples = example_reader.jsonl_file_reader(input_instances)
     print(examples)
