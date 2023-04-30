@@ -10,7 +10,7 @@ templates:
       world, complete the conclusion (fill in the blank) so that the conclusion is {{answer_choices[label]}} based on the statement.
       Do not repeat the conclusion, be creative."
     template: "statement: {{sentence1.replace(span, '[blank]')}} \nconclusion: {{sentence2}} \n[blank] should be"
-    template_insert: "Given a statement {{sentence1.replace(span, '[insert]')}}, it is {{ answer_choices[label] }} that {{sentence2}}"
+    template_insert: "Here is a statement, {{sentence1.replace(span, '[insert]')}}\nBased on this statement, it is {{answer_choices[label]}} that {{sentence2}}"
     name: statement-conclusion-true
 
   masked_cad_hypothesis:
