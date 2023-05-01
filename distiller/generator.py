@@ -3,8 +3,6 @@ import logging
 
 from tqdm import tqdm
 from torch.utils.data import DataLoader
-from distiller.db import update
-
 
 logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s", level=logging.INFO
