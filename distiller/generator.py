@@ -125,7 +125,7 @@ class Generator:
             if record is None:
                 logger.info("Warning: record not found, skipping ...")
                 continue
-            if record.accept:
+            if record.accept and not self.args.overgenerate:
                 logger.info("Warning: accepted record, skipping ...")
                 continue
             response = self.generator(query)
