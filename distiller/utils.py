@@ -1,22 +1,24 @@
 import os
 import json
 import yaml
-import logging
 
-logging.basicConfig(
-    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger("cad_generator.util")
+def read_json(path, mode="r", **kwargs):
+    return json.loads(read_file(path, mode=mode, **kwargs))
 
+def write_json(data, path):
+    return write_file(json.dumps(data, indent=2), path)
 
 def to_jsonl(data):
     return json.dumps(data).replace("\n", "")
 
+def read_file(path, mode="r", **kwargs):
+    """Reads a file and returns its content."""
+    with open(path, mode=mode, **kwargs) as f:
+        return f.read()
 
 def write_file(data, path, mode="w", **kwargs):
     with open(path, mode=mode, **kwargs) as f:
         f.write(data)
-
 
 def read_jsonl(path, mode="r", **kwargs):
     ls = []
@@ -25,11 +27,11 @@ def read_jsonl(path, mode="r", **kwargs):
             ls.append(json.loads(line))
     return ls
 
-
 def write_jsonl(data, path, mode="w"):
     assert isinstance(data, list)
     lines = [to_jsonl(elem) for elem in data]
     write_file("\n".join(lines) + "\n", path, mode=mode)
+
 
 
 def read_from_yaml_file(dataset_name):
