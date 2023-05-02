@@ -1,3 +1,5 @@
+import os
+import time
 import wandb
 import openai
 import hydra
@@ -5,13 +7,13 @@ import logging
 import transformers
 
 from hydra import initialize
-from omegaconf import DictConfig
+from omegaconf import DictConfig, open_dict
 
 from distiller.db import get_database
 from distiller.prompt.core import Task
 from distiller.prompt.retrieval import get_task_class
 from distiller.generator import Generator
-from distiller.utils import write_jsonl
+from distiller.utils import write_json
 # from distiller.filter import (
 #     NLIEnsembleFilter,
 #     AutomaticHeuristicFilter,
@@ -58,12 +60,29 @@ class DistillerRunner:
        raise NotImplementedError
     
     def write_outputs(self, generation_outputs):
-        logger.info("Writing outputs ...")
-        write_jsonl(
-            generation_outputs,
-            self.args.output_pth,
+        meta_data = {
+            "dataset": self.args.dataset,
+            "template_name": self.args.template_name,
+            "gen_type": self.args.gen_type,
+            "source_label": self.args.source_label,
+            "target_label": self.args.target_label,
+            "start": self.args.start,
+            "end": self.args.end
+        }
+
+        output_file = {
+            "meta_data": meta_data,
+            "outputs": generation_outputs
+        }
+
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        output_pth = os.path.join(
+            self.args.output_dir,
+            f"{timestr}.json",
         )
-        logger.info(f"Outputs written to {self.args.output_pth}.")
+
+        write_json(output_file, output_pth,)
+        logger.info(f"Outputs written to {output_pth}.")
     
     def main_loop(self):
         querys = self.compose_loop()
@@ -71,6 +90,15 @@ class DistillerRunner:
         if self.args.do_filter:
             self.filter_loop()
         self.write_outputs(generation_outputs)
+
+
+def setup_path(args):
+    output_dir = os.path.join(args.data_dir, args.dataset, "output")
+    input_pth = os.path.join(args.data_dir, args.dataset, args.source_label)
+
+    with open_dict(args):
+        args.output_dir = output_dir
+        args.input_pth = input_pth
 
 
 @hydra.main(config_path="config/secret/", config_name="keys")
