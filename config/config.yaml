@@ -10,6 +10,7 @@ generator_params:
   end: 1000                             # end position of the dataset for the current batch
   type: e2c                             # type of counterfactual: e2c | c2e | e2n | c2n
   template: masked_cad_premise          
+  overgenerate: False
 
 search_params: 
   num_neighbors: 8                      # number of nearest neighbors
