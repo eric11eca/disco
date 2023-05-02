@@ -1,6 +1,9 @@
 import os
 import json
 import yaml
+import logging
+
+logger = logging.getLogger("distiller.utils")
 
 def read_json(path, mode="r", **kwargs):
     return json.loads(read_file(path, mode=mode, **kwargs))
