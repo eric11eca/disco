@@ -1,6 +1,6 @@
 from distiller.prompt.core import Task
 from distiller.prompt.lib.anli import AdversarialNliTask
-from distiller.prompt.lib.anli import SNLITask
+from distiller.prompt.lib.snli import SNLITask
 
 TASK_DICT = {
     "adversarial_nli": AdversarialNliTask,
