@@ -70,7 +70,7 @@ class Generator:
             presence_penalty=0.5,
             stop=["stop", "\n", "."]
         )
-        return response
+        return response['choices'][0]['text']
 
     def completion(self, prompt):
         response = openai.Completion.create(
@@ -82,7 +82,7 @@ class Generator:
             frequency_penalty=0.8,
             presence_penalty=0.5
         )
-        return response
+        return response['choices'][0]['text']
 
     def chat(self, prompt):
         messages = [{"role": "system", "content": prompt['instruction']}]
@@ -96,10 +96,9 @@ class Generator:
             model=self.model,
             messages=messages
         )
-        return response
-
-    def postprocess(self, response, record):
-        output = response['choices'][0]['text']
+        return response['choices'][0]['message']['content']
+    
+    def postprocess(self, output, record):
         output = output.replace("\n", "").strip()
         record.gen_out = output
         return record
