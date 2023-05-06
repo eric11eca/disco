@@ -18,9 +18,9 @@ generator_models = {
 
 
 class Generator:
-    def __init__(self, args, cache):
+    def __init__(self, args):
         self.args = args
-        self.cache = cache
+        #self.cache = cache
         self.generation_outputs = []
         self.num_records = 0
 

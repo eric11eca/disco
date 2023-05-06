@@ -4,7 +4,7 @@ from hydra import compose
 
 from distiller.api import GPTQuery
 from distiller.utils import read_jsonl
-from distiller.db import update
+from distiller.db import insert
 from distiller.prompt.core import labels_to_bimap, Task
 from distiller.prompt.template.sentence_pair_classification import (
     SentencePairPrompt,
@@ -102,14 +102,12 @@ class SNLITask(Task):
     @classmethod
     def postprocess_generation(cls, cache, generated):        
         for record in generated:
-            old_data = record.__dict__()[record.mode]
+            record_dict = record.__dict__()
+            old_data = record_dict[record.mode]
             span_prev = record.span_prev
             new_data = old_data.replace(span_prev, record.gen_out)
-            update(cache, {"guid": record.guid}, {
-                "$set": {
-                    "gen_out": record.gen_out,
-                    "score": 0.0,
-                    f"new_{record.mode}": new_data
-                }})
-
+            record_dict["gen_out"] = record.gen_out
+            record_dict["score"] = 0.0
+            record_dict[f"new_{record.mode}"] = new_data
+            insert(cache, record_dict)
         return generated

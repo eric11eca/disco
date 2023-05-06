@@ -204,7 +204,7 @@ class SentencePairComposer(BaseComposer):
             record.accept = cls._commit(record, cache)
 
         seed_records = [
-            record for record in seed_records if not record.accept]
+            record for record in seed_records]
 
         return seed_records
 

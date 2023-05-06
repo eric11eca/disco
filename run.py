@@ -31,9 +31,15 @@ transformers.logging.set_verbosity_error()
 
 
 class DistillerRunner:
-    def __init__(self, args, cache, task_container: Task):
+    def __init__(self, args, cache,):
         self.args = args
-        self.generator = Generator(args, cache)
+        cache.create_collection(f"{args.dataset}_{args.template_name}_input")
+        cache.create_collection(f"{args.dataset}_{args.template_name}_gen")
+        input_cache = cache[f"{args.dataset}_{args.template_name}_input"]
+        output_cache = cache[f"{args.dataset}_{args.template_name}_gen"]
+        self.generator = Generator(args)
+        self.input_cache = input_cache
+        self.output_cache = output_cache
         self.generation_outputs = []
         initialize(config_path="./templates", version_base="1.3")
 
@@ -41,7 +47,7 @@ class DistillerRunner:
         logger.info("Loading input data and composing prompts ...")
         self.task_container = get_task_class(
             self.args.task_name)
-        querys = self.task_container.build_prompts()
+        querys = self.task_container.build_prompts(self.args, self.input_cache)
         logger.info(f"Composed {len(self.task_container)} prompts.")
         return querys
     
@@ -52,7 +58,7 @@ class DistillerRunner:
         
         logger.info("Postprocessing generation outputs ...")
         self.task_container.postprocess_generation(
-            self.cache, generation_outputs)
+            self.output_cache, generation_outputs)
         logger.info("Postprocessing complete, updates persisted to cache.")
         return generation_outputs
     
