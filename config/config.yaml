@@ -13,6 +13,7 @@ data_params:
 generator_params:
   gen_type: completion                  # gpt-3 generation mode: completion | insertion | chat
   model_name: gpt-3-003                 # generation model name: gpt-3-003 | gpt-3-002 | chatgpt | gpt-4
+  overgenerate: False
 
 search_params: 
   num_neighbors: 8                      # number of nearest neighbors

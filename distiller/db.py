@@ -1,15 +1,15 @@
 from pymongo import MongoClient
 
-def get_database(dataset="snli", type="c2e"):
-    """Returns the database instance for the given dataset and type
+def get_database(dataset="snli", template_name="masked_cad_premise"):
+    """Returns the database instance for the given dataset and template_name
    
     :param dataset: the dataset to be used
-    :param type: the type of the dataset
+    :param template_name: the type of the template
     :return: the database instance
     """
     CONNECTION_STRING = "localhost:27017"
     client = MongoClient(CONNECTION_STRING)
-    collection = client['disco'][f"{dataset}_{type}"]
+    collection = client['disco']#[f"{dataset}_{type}"]
     return collection
 
 def query(collection, query):

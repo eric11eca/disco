@@ -217,6 +217,6 @@ class SentencePairComposer(BaseComposer):
         for record in tqdm(seed_records):
             record.accept = cls._commit(record, cache)
 
-        seed_records = [record for record in seed_records if not record.accept]
+        seed_records = [record for record in seed_records]
 
         return seed_records
