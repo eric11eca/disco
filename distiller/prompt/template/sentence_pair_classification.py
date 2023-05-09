@@ -26,8 +26,8 @@ class SentencePairPrompt(BasePrompt):
     suffix: Optional[str] = None
     span_prev: Optional[str] = None
     sentence1_spans: Optional[List[str]] = None
-    sentence2_spans: Optional[List[str]]= None
-    
+    sentence2_spans: Optional[List[str]] = None
+
     def __dict__(self) -> dict:
         defualt = {
             "guid": self.guid,
@@ -72,7 +72,7 @@ class SentencePairExample(BaseExample):
 
 
 class SentencePairExampleReader(BaseExampleReader):
-    @ staticmethod
+    @staticmethod
     def _read(instance):
         """Reads a single json line from the target file. Modify here when the json schema changes
 
@@ -83,14 +83,12 @@ class SentencePairExampleReader(BaseExampleReader):
         text_input = instance["input"]
         text_output = instance["output"]
         return SentencePairExample(
-            guid=guid,
-            text_input=text_input,
-            text_output=text_output
+            guid=guid, text_input=text_input, text_output=text_output
         )
 
 
 class SentencePairComposer(BaseComposer):
-    @ staticmethod
+    @staticmethod
     def _build_promtp_instance(
         template,
         template_insert,
@@ -111,19 +109,17 @@ class SentencePairComposer(BaseComposer):
             "sentence2": sentence2,
             "span": span,
             "label": new_label,
-            "answer_choices": answer_choices
+            "answer_choices": answer_choices,
         }
 
         prompt = SentencePairComposer._compose_prompt(
-            template=template,
-            render_items=render_items
+            template=template, render_items=render_items
         )
 
         prompt_insert = SentencePairComposer._compose_prompt(
-            template=template_insert,
-            render_items=render_items
+            template=template_insert, render_items=render_items
         )
-        
+
         prefix = prompt_insert.split("[insert]")[0]
         suffix = prompt_insert.split("[insert]")[1]
 
@@ -147,7 +143,7 @@ class SentencePairComposer(BaseComposer):
 
         return prompt_instance
 
-    @ staticmethod
+    @staticmethod
     def _read(instance, templates, target_label):
         """Reads a single json line from the target file. Modify here when the json schema changes
 
@@ -169,16 +165,34 @@ class SentencePairComposer(BaseComposer):
         if templates.mode == "sentence1":
             problems1 = [
                 SentencePairComposer._build_promtp_instance(
-                    template, template_insert, instance, 
-                    target_label, span, templates.mode, answer_choices, i)
-                for i, span in enumerate(sentence1_spans) if span in sentence1]
+                    template,
+                    template_insert,
+                    instance,
+                    target_label,
+                    span,
+                    templates.mode,
+                    answer_choices,
+                    i,
+                )
+                for i, span in enumerate(sentence1_spans)
+                if span in sentence1
+            ]
             problems.extend(problems1)
         elif templates.mode == "sentence2":
             problems2 = [
                 SentencePairComposer._build_promtp_instance(
-                    template, template_insert, instance, 
-                    target_label, span, templates.mode, answer_choices, i)
-                for i, span in enumerate(sentence2_spans) if span in sentence2]
+                    template,
+                    template_insert,
+                    instance,
+                    target_label,
+                    span,
+                    templates.mode,
+                    answer_choices,
+                    i,
+                )
+                for i, span in enumerate(sentence2_spans)
+                if span in sentence2
+            ]
             problems.extend(problems2)
         return problems
 
@@ -198,13 +212,11 @@ class SentencePairComposer(BaseComposer):
         for instance in tqdm(instances):
             records = cls._read(instance, templates, args.target_label)
             seed_records.extend(records),
-        
+
         print("Committing prompts...")
         for record in tqdm(seed_records):
             record.accept = cls._commit(record, cache)
 
-        seed_records = [
-            record for record in seed_records if not record.accept]
+        seed_records = [record for record in seed_records if not record.accept]
 
         return seed_records
-

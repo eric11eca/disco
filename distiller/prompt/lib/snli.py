@@ -10,7 +10,7 @@ from distiller.prompt.template.sentence_pair_classification import (
     SentencePairPrompt,
     SentencePairExample,
     SentencePairComposer,
-    SentencePairExampleReader
+    SentencePairExampleReader,
 )
 
 
@@ -35,21 +35,26 @@ class SNLITask(Task):
     }  # Attributions for controlling the counterfactuals
 
     NO_GEN_PHRASES = [
-        'it is true', 'it is false',
-        'it is true', 'it is false',
-        '[blank]', 'story:', 'conclusion:',
-        'context:', 'answer:', 'statement:'
+        "it is true",
+        "it is false",
+        "it is true",
+        "it is false",
+        "[blank]",
+        "story:",
+        "conclusion:",
+        "context:",
+        "answer:",
+        "statement:",
     ]
 
     @staticmethod
     def _load_examples(args):
         examples_from_file = read_jsonl(args.demo_pth)
-        examples = [SNLITask.Example(
-            **example) for example in examples_from_file]
+        examples = [SNLITask.Example(**example) for example in examples_from_file]
         return examples
 
     @staticmethod
-    def _load_template(task, template_name):  
+    def _load_template(task, template_name):
         cfg = compose(config_name=task)
         template = cfg.templates[template_name]
         return template
@@ -70,46 +75,42 @@ class SNLITask(Task):
 
     @classmethod
     def build_prompts(cls, args, cache):
-        instances = cls._load_base_data(args) 
+        instances = cls._load_base_data(args)
 
-        templates = cls._load_template(
-            cls.TASK, args.template_name)
-        
+        templates = cls._load_template(cls.TASK, args.template_name)
+
         instruction = cls.Composer._compose_instruction(
             templates.instruction,
-            {
-                "answer_choices": templates.answer_choices,
-                "label": args.target_label
-            },
+            {"answer_choices": templates.answer_choices, "label": args.target_label},
         )
 
-        records = cls.Composer.read_and_compose(
-            args, cache, instances[:10], templates)
+        records = cls.Composer.read_and_compose(args, cache, instances[:10], templates)
 
         demonstration = cls.ExampleReader.jsonl_file_reader(args.demo_pth)
         demonstration = random.choices(demonstration, k=4)
 
         querys = []
         for record in records:
-            query = cls._craft(
-                record,
-                demonstration,
-                instruction,
-                args.gen_type)
+            query = cls._craft(record, demonstration, instruction, args.gen_type)
             querys.append((record, query))
         return querys
-    
+
     @classmethod
-    def postprocess_generation(cls, cache, generated):        
+    def postprocess_generation(cls, cache, generated):
         for record in generated:
             old_data = record.__dict__()[record.mode]
             span_prev = record.span_prev
             new_data = old_data.replace(span_prev, record.gen_out)
-            update(cache, {"guid": record.guid}, {
-                "$set": {
-                    "gen_out": record.gen_out,
-                    "score": 0.0,
-                    f"new_{record.mode}": new_data
-                }})
+            update(
+                cache,
+                {"guid": record.guid},
+                {
+                    "$set": {
+                        "gen_out": record.gen_out,
+                        "score": 0.0,
+                        f"new_{record.mode}": new_data,
+                    }
+                },
+            )
 
         return generated

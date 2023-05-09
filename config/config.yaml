@@ -3,13 +3,16 @@ paths:
   filter_dir: ./data/filtered           # filtered output directory
   demo_dir: ./data/examples             # demonstration directory
 
-generator_params:
-  gen_type: completion                  # gpt-3 generation mode: completion | insertion | chat
+data_params:
   dataset: snli_hard                    # base dataset for conterfactual generation
   start: 0                              # start position of the dataset for the current batch
   end: 1000                             # end position of the dataset for the current batch
-  type: e2c                             # type of counterfactual: e2c | c2e | e2n | c2n
-  template: masked_cad_premise          
+  template_name: masked_cad_premise     # template name for counterfactual generation 
+  target_label: entailment              # target label for counterfactual generation
+
+generator_params:
+  gen_type: completion                  # gpt-3 generation mode: completion | insertion | chat
+  model_name: gpt-3-003                 # generation model name: gpt-3-003 | gpt-3-002 | chatgpt | gpt-4
 
 search_params: 
   num_neighbors: 8                      # number of nearest neighbors
