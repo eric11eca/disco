@@ -1,32 +1,39 @@
-paths:
+#paths:
   out_dir: ./data/output                # output directory
   filter_dir: ./data/filtered           # filtered output directory
-  demo_dir: ./data/examples             # demonstration directory
+  demo_pth: ./data/examples             # demonstration directory
+  data_dir: ./data/input
 
-data_params:
-  dataset: snli_hard                    # base dataset for conterfactual generation
+#data_params:
+  dataset: snli                    # base dataset for conterfactual generation
+  task_name: snli                       # the type of task defined in prompt.retrieval
   start: 0                              # start position of the dataset for the current batch
-  end: 1000                             # end position of the dataset for the current batch
+  end: 11                             # end position of the dataset for the current batch
   template_name: masked_cad_premise     # template name for counterfactual generation 
-  target_label: entailment              # target label for counterfactual generation
+  source_label: entailment              # source label for counterfactual generation
+  target_label: neutral              # target label for counterfactual generation
 
-generator_params:
+#generator_params:
   gen_type: completion                  # gpt-3 generation mode: completion | insertion | chat
   model_name: gpt-3-003                 # generation model name: gpt-3-003 | gpt-3-002 | chatgpt | gpt-4
-  overgenerate: False
+  overgenerate: False                   # determine whether it is able to generate more than 1 counterfactual instances for an input instance
+  no_demo: True                         # determine if generating without in-context examples in the prompt
 
-search_params: 
+#search_params: 
   num_neighbors: 8                      # number of nearest neighbors
   embed_type: CLS                       # type of embedding method
   metric: euclidean                     # distance metric used for nearest neighbor
   encoder_name: roberta-large-nli-mean-tokens    # "name of the encoder for sentence embedding
   prompt_search: True                   # enable dynamically selecting demonstrations
 
-util_params:
+#filter_params:
+  do_filter: False                      # whether to run through the filter after generation
+
+#util_params:
   local_rank: 0                         # locak rank of cuda devices
   api_idx: 0                            # api index if multiple api tokens
 
-wandb_params:
+#wandb_params:
   project: gpt3-counterfactual-generation
   entity: causal_scaffold
   name: gpt_generation_logger

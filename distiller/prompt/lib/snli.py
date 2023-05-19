@@ -70,12 +70,12 @@ class SNLITask(Task):
 
     @staticmethod
     def _load_base_data(args):
-        base_data = read_jsonl(args.data_pth)
+        base_data = read_jsonl(args.input_pth)
         return base_data
 
     @classmethod
     def build_prompts(cls, args, cache):
-        instances = cls._load_base_data(args)
+        instances = cls._load_base_data(args)[args.start: args.end]
 
         templates = cls._load_template(cls.TASK, args.template_name)
 
@@ -84,10 +84,13 @@ class SNLITask(Task):
             {"answer_choices": templates.answer_choices, "label": args.target_label},
         )
 
-        records = cls.Composer.read_and_compose(args, cache, instances[:10], templates)
+        records = cls.Composer.read_and_compose(args, cache, instances, templates)
 
-        demonstration = cls.ExampleReader.jsonl_file_reader(args.demo_pth)
-        demonstration = random.choices(demonstration, k=4)
+        if(args.no_demo):
+            demonstration = []
+        else:
+            demonstration = cls.ExampleReader.jsonl_file_reader(args.demo_pth)
+            demonstration = random.choices(demonstration, k=4)
 
         querys = []
         for record in records:
@@ -97,6 +100,7 @@ class SNLITask(Task):
 
     @classmethod
     def postprocess_generation(cls, cache, generated):
+        normalized = []
         for record in generated:
             record_dict = record.__dict__()
             old_data = record_dict[record.mode]
@@ -106,4 +110,6 @@ class SNLITask(Task):
             record_dict["score"] = 0.0
             record_dict[f"new_{record.mode}"] = new_data
             insert(cache, record_dict)
-        return generated
+            record_dict.pop("_id")
+            normalized.append(record_dict)
+        return normalized

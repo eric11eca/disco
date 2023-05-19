@@ -33,22 +33,23 @@ transformers.logging.set_verbosity_error()
 class DistillerRunner:
     def __init__(self, args, cache,):
         self.args = args
-        cache.create_collection(f"{args.dataset}_{args.template_name}_input")
-        cache.create_collection(f"{args.dataset}_{args.template_name}_gen")
+        create_collection(cache, f"{args.dataset}_{args.template_name}_input")
+        create_collection(cache, f"{args.dataset}_{args.template_name}_gen")
         input_cache = cache[f"{args.dataset}_{args.template_name}_input"]
         output_cache = cache[f"{args.dataset}_{args.template_name}_gen"]
         self.generator = Generator(args)
         self.input_cache = input_cache
         self.output_cache = output_cache
         self.generation_outputs = []
-        initialize(config_path="./templates", version_base="1.3")
+        hydra.core.global_hydra.GlobalHydra.instance().clear()
+        initialize(config_path="./templates", version_base="1.3.2")
 
     def compose_loop(self):
         logger.info("Loading input data and composing prompts ...")
         self.task_container = get_task_class(
             self.args.task_name)
         querys = self.task_container.build_prompts(self.args, self.input_cache)
-        logger.info(f"Composed {len(self.task_container)} prompts.")
+        logger.info(f"Composed {len(querys)} prompts.")
         return querys
     
     def generate_loop(self, querys):
@@ -57,7 +58,7 @@ class DistillerRunner:
         logger.info(f"Generated {len(generation_outputs)} data points.")
         
         logger.info("Postprocessing generation outputs ...")
-        self.task_container.postprocess_generation(
+        generation_outputs = self.task_container.postprocess_generation(
             self.output_cache, generation_outputs)
         logger.info("Postprocessing complete, updates persisted to cache.")
         return generation_outputs
@@ -86,7 +87,6 @@ class DistillerRunner:
             self.args.output_dir,
             f"{timestr}.json",
         )
-
         write_json(output_file, output_pth,)
         logger.info(f"Outputs written to {output_pth}.")
     
@@ -99,30 +99,42 @@ class DistillerRunner:
 
 
 def setup_path(args):
-    output_dir = os.path.join(args.data_dir, args.dataset, "output")
-    input_pth = os.path.join(args.data_dir, args.dataset, args.source_label)
+    output_dir = args.out_dir
+    for extra_path in [args.dataset, f"{args.source_label}_{args.target_label}"]:
+        output_dir = os.path.join(output_dir, extra_path)
+        if(not os.path.isdir(output_dir)):
+            os.mkdir(output_dir)
+    input_pth = os.path.join(args.data_dir, args.dataset, f"{args.source_label}_spans.jsonl")
 
     with open_dict(args):
         args.output_dir = output_dir
         args.input_pth = input_pth
 
 
-@hydra.main(config_path="config/secret/", config_name="keys")
+def create_collection(cache, collection_name):
+    try:
+        cache.createCollection(collection_name)
+    except Exception as e:
+        pass
+
+
+
+@hydra.main(config_path="config/secret/", config_name="keys", version_base="1.3.2")
 def set_up_api(keys: DictConfig):
     openai.organization = keys.organization_token
-    openai.api_key = keys.api_token1
+    openai.api_key = keys.api_token_1
 
 
-@hydra.main(config_path="config", config_name="config")
+@hydra.main(config_path="config", config_name="config", version_base="1.3.2")
 def main(args: DictConfig):
     # wandb_run = wandb.init(
     #     project=args.project,
     #     entity=args.entity,
     #     name=args.name,
     # )
-
     cache = get_database(args.dataset, args.template_name)
     runner = DistillerRunner(args, cache)
+    setup_path(args)
     runner.main_loop()
 
 
