@@ -31,12 +31,8 @@ transformers.logging.set_verbosity_error()
 
 
 class DistillerRunner:
-    def __init__(self, args, cache,):
+    def __init__(self, args, input_cache, output_cache):
         self.args = args
-        create_collection(cache, f"{args.dataset}_{args.template_name}_input")
-        create_collection(cache, f"{args.dataset}_{args.template_name}_gen")
-        input_cache = cache[f"{args.dataset}_{args.template_name}_input"]
-        output_cache = cache[f"{args.dataset}_{args.template_name}_gen"]
         self.generator = Generator(args)
         self.input_cache = input_cache
         self.output_cache = output_cache
@@ -99,30 +95,33 @@ class DistillerRunner:
 
 
 def setup_path(args):
-    output_dir = args.out_dir
-    for extra_path in [args.dataset, f"{args.source_label}_{args.target_label}"]:
-        output_dir = os.path.join(output_dir, extra_path)
-        if(not os.path.isdir(output_dir)):
-            os.mkdir(output_dir)
-    input_pth = os.path.join(args.data_dir, args.dataset, f"{args.source_label}_spans.jsonl")
+    category = f"{args.source_label}_{args.target_label}"
+    output_dir = os.path.join(
+        args.data_dir, args.dataset, "output", category)
+    if(not os.path.isdir(output_dir)):
+        os.makedirs(output_dir, exist_ok=True)
+
+    source = f"{args.source_label}.jsonl"
+    input_pth = os.path.join(
+        args.data_dir, args.dataset, "input", source)
+    
+    demo_pth = os.path.join(
+        args.data_dir, args.dataset, "examples", category)
+    
+    aug_pth = os.path.join(
+        args.data_dir, args.dataset, "augment", category)
 
     with open_dict(args):
         args.output_dir = output_dir
         args.input_pth = input_pth
-
-
-def create_collection(cache, collection_name):
-    try:
-        cache.createCollection(collection_name)
-    except Exception as e:
-        pass
-
+        args.demo_pth = demo_pth
+        args.aug_pth = aug_pth
 
 
 @hydra.main(config_path="config/secret/", config_name="keys", version_base="1.3.2")
 def set_up_api(keys: DictConfig):
     openai.organization = keys.organization_token
-    openai.api_key = keys.api_token_1
+    openai.api_key = keys.api_token
 
 
 @hydra.main(config_path="config", config_name="config", version_base="1.3.2")
@@ -132,8 +131,9 @@ def main(args: DictConfig):
     #     entity=args.entity,
     #     name=args.name,
     # )
-    cache = get_database(args.dataset, args.template_name)
-    runner = DistillerRunner(args, cache)
+
+    input_cache, output_cache = get_database(args.dataset, args.template_name)
+    runner = DistillerRunner(args, input_cache, output_cache)
     setup_path(args)
     runner.main_loop()
 
