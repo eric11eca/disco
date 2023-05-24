@@ -1,5 +1,12 @@
 from pymongo import MongoClient
 
+def create_collection(cache, collection_name):
+    """Creates a collection in the database"""
+    try:
+        cache.createCollection(collection_name)
+    except Exception as e:
+        pass
+
 def get_database(dataset="snli", template_name="masked_cad_premise"):
     """Returns the database instance for the given dataset and template_name
    
@@ -9,8 +16,16 @@ def get_database(dataset="snli", template_name="masked_cad_premise"):
     """
     CONNECTION_STRING = "localhost:27017"
     client = MongoClient(CONNECTION_STRING)
-    collection = client.get_database('disco')#[f"{dataset}_{type}"]
-    return collection
+    collection = client.get_database('disco')
+
+    input_name = f"{dataset}_{template_name}_input"
+    gen_name = f"{dataset}_{template_name}_gen"
+
+    create_collection(collection, input_name)
+    create_collection(collection, gen_name)
+    input_cache = collection[input_name]
+    output_cache = collection[gen_name]
+    return input_cache, output_cache
 
 def query(collection, query):
     """Queries the database for the given query
