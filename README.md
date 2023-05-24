@@ -1,5 +1,9 @@
-![Title](./img/disco_main_50.png)
-"The distillation process with a robot, scifi, future, detail, high resolution, 8k" by Midjourney
+<!-- ![Title](./img/disco_main_50.png) -->
+<p align="center">
+  <img src="./img/disco_main_50.png" />
+  <br>
+  "The distillation process with a robot, scifi, future, detail, high resolution, 8k" by Midjourney
+</p>
 
 # DISCO: Distilling Phrasal Counterfactuals with Large Language Models
 
