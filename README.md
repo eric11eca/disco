@@ -1,4 +1,4 @@
-![Title](./img/disco_main.png)
+![Title](./img/disco_main_50.png)
 "The distillation process with a robot, scifi, future, detail, high resolution, 8k" by Midjourney
 
 # DISCO: Distilling Phrasal Counterfactuals with Large Language Models
