@@ -55,7 +55,7 @@ class GPTQuery:
         prompt = {
             "instruction": self.instruction,
             "examples": self.examples,
-            "input": record["prompt"]
+            "problem": record.prompt
         }
         return prompt
 

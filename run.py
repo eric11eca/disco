@@ -67,6 +67,7 @@ class DistillerRunner:
             "dataset": self.args.dataset,
             "template_name": self.args.template_name,
             "gen_type": self.args.gen_type,
+            "engine": self.args.model_name,
             "source_label": self.args.source_label,
             "target_label": self.args.target_label,
             "start": self.args.start,
