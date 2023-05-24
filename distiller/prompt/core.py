@@ -100,11 +100,8 @@ class BaseComposer:
         :param cache: the database instance
         """
         db_record = query(cache, {"guid": record.guid})
-        if db_record is not None and db_record["accept"]:
-            return True
-        else:
+        if db_record is None:
             insert(cache, record.__dict__())
-            return False
 
     @classmethod
     def read_and_compose(cls, instances, cache, templates):
@@ -115,13 +112,7 @@ class BaseComposer:
         :param cache: the database instance
         :param templates: the templates to be used for prompt
         """
-        all_guids = []
-        for instance in instances:
-            records = cls._read(instance, templates)
-            guids = [cls._commit(record, cache) for record in records]
-            guids = [guid for guid in guids if guid != ""]
-            all_guids.extend(guids)
-        return all_guids
+        NotImplemented
 
 
 class BaseExampleReader:

@@ -215,7 +215,7 @@ class SentencePairComposer(BaseComposer):
 
         print("Committing prompts...")
         for record in tqdm(seed_records):
-            record.accept = cls._commit(record, cache)
+            cls._commit(record, cache)
 
         seed_records = [record for record in seed_records]
 
