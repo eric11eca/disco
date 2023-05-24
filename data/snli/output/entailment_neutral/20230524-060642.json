@@ -1,0 +1,12 @@
+{
+  "meta_data": {
+    "dataset": "snli",
+    "template_name": "masked_cad_premise",
+    "gen_type": "completion",
+    "source_label": "entailment",
+    "target_label": "neutral",
+    "start": 0,
+    "end": 11
+  },
+  "outputs": []
+}
