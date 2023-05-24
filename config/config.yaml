@@ -1,17 +1,14 @@
 #paths:
-  out_dir: ./data/output                # output directory
-  filter_dir: ./data/filtered           # filtered output directory
-  demo_pth: ./data/examples             # demonstration directory
-  data_dir: ./data/input
+  data_dir: ./data/
 
 #data_params:
-  dataset: snli                    # base dataset for conterfactual generation
+  dataset: snli                         # base dataset for conterfactual generation
   task_name: snli                       # the type of task defined in prompt.retrieval
   start: 0                              # start position of the dataset for the current batch
-  end: 11                             # end position of the dataset for the current batch
+  end: 11                               # end position of the dataset for the current batch
   template_name: masked_cad_premise     # template name for counterfactual generation 
   source_label: entailment              # source label for counterfactual generation
-  target_label: neutral              # target label for counterfactual generation
+  target_label: neutral                 # target label for counterfactual generation
 
 #generator_params:
   gen_type: completion                  # gpt-3 generation mode: completion | insertion | chat
@@ -20,11 +17,11 @@
   no_demo: True                         # determine if generating without in-context examples in the prompt
 
 #search_params: 
-  num_neighbors: 8                      # number of nearest neighbors
-  embed_type: CLS                       # type of embedding method
-  metric: euclidean                     # distance metric used for nearest neighbor
+  num_neighbors: 8                               # number of nearest neighbors
+  embed_type: CLS                                # type of embedding method
+  metric: euclidean                              # distance metric used for nearest neighbor
   encoder_name: roberta-large-nli-mean-tokens    # "name of the encoder for sentence embedding
-  prompt_search: True                   # enable dynamically selecting demonstrations
+  prompt_search: True                            # enable dynamically selecting demonstrations
 
 #filter_params:
   do_filter: False                      # whether to run through the filter after generation
