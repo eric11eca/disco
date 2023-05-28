@@ -47,6 +47,13 @@ class SNLITask(Task):
         "statement:",
     ]
 
+    FILTER_MODELS = [
+        "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
+        "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli",
+        "alisawuffles/roberta-large-wanli"
+        "Joelzhang/deberta-v3-large-snli_mnli_fever_anli_R1_R2_R3-nli"
+    ]
+
     @staticmethod
     def _load_examples(args):
         examples_from_file = read_jsonl(args.demo_pth)
