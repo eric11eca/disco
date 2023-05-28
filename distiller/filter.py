@@ -11,78 +11,61 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
 from transformers import (
+    AutoConfig,
     AutoTokenizer,
     AutoModelForSequenceClassification
 )
 
-from .api import (
-    label2id,
-    forbidden_phrases,
-    negation_words
-)
-
 from .db import update, query
 
-
-class AutomaticHeuristicFilter:
+class BaseFilter():
+    def _normalize(self, text):
+        return self._strip_punctuation_and_casing(text)
+    
     def _strip_punctuation_and_casing(self, s):
         s = s.lower()
         s = s.translate(str.maketrans('', '', string.punctuation))
         return s
+    
+    def run(self, outputs, cache, mode):
+        raise NotImplementedError
 
-    def _normalize(self, text):
-        return self._strip_punctuation_and_casing(text)
 
-    def heuristic_filtering(self, data, mode):
-        premise = self._normalize(data["premise"])
-        hypothesis = self._normalize(data["hypothesis"])
+class SentencePairHeuristicFilter(BaseFilter):
+    def heuristic_filtering(self, data, mode=None, forbidden=[], negations=[]):
+        sentence1 = self._normalize(data["sentence1"])
+        sentence2 = self._normalize(data["sentence2"])
         gen_out = self._normalize(data["gen_out"])
+        new_input = self._normalize(data[f"new_{mode}"])
 
-        if isinstance(data[f"new_{mode}"], list):
-            new_input = self._normalize(data[f"new_{mode}"][0])
-        else:
-            new_input = self._normalize(data[f"new_{mode}"])
-
-        if gen_out == hypothesis:
-            return True, "copied_hypothesis"
-        elif hypothesis in gen_out:
-            return True, "coverd_hypothesis"
-        elif gen_out in hypothesis:
-            return True, "coverd_by_hypothesis"
-        elif gen_out in premise:
-            return True, "coverd_by_premise"
-        elif tdist.jaccard(gen_out.split(), hypothesis.split()) > 0.6:
-            return True, "overlap_hypothesis"
-        elif tdist.jaccard(gen_out.split(), premise.split()) > 0.35:
-            return True, "overlap_premise"
-        elif np.any([x in data["gen_out"] for x in forbidden_phrases]):
+        if gen_out == sentence2:
+            return True, "copied_sentence2"
+        elif sentence2 in gen_out:
+            return True, "coverd_sentence2"
+        elif gen_out in sentence2:
+            return True, "coverd_by_sentence2"
+        elif gen_out in sentence1:
+            return True, "coverd_by_sentence1"
+        elif tdist.jaccard(gen_out.split(), sentence2.split()) > 0.6:
+            return True, "overlap_sentence2"
+        elif tdist.jaccard(gen_out.split(), sentence1.split()) > 0.35:
+            return True, "overlap_sentence1"
+        elif np.any([x in data["gen_out"] for x in forbidden]):
             return True, "forbidden_phrase"
-        elif data["new_label"] == "contradiction" and np.any([x in gen_out for x in negation_words]):
+        elif data["new_label"] == "contradiction" and np.any([x in gen_out for x in negations]):
             return True, "negation_word"
         elif "_" in data["gen_out"]:
             return True, "large_gap"
         elif "________" in data["gen_out"]:
             return True, "large_gap"
-        elif mode == "premise" and tdist.jaccard(new_input.split(), hypothesis.split()) > 0.5:
-            return True, "overlap_hypothesis_all"
-        elif mode == "hypothesis" and tdist.jaccard(new_input.split(), hypothesis.split()) > 0.8:
-            return True, "overlap_hypothesis_all"
+        elif mode == "sentence1" and tdist.jaccard(new_input.split(), sentence2.split()) > 0.8:
+            return True, "overlap_sentence2_all"
+        elif mode == "sentence2" and tdist.jaccard(new_input.split(), sentence1.split()) > 0.8:
+            return True, "overlap_sentence1_all"
         return False, "none"
 
     def run(self, outputs, cache, mode):
-        discards = {
-            'overlap_hypothesis': 0,    # gen_output largely overlaps the hypothesis
-            'copied_hypothesis': 0,     # gen_output == hypothesis
-            'coverd_hypothesis': 0,     # gen_output covers the hypothesis
-            'coverd_by_premise': 0,
-            'overlap_premise': 0,
-            'coverd_by_hypothesis': 0,  # gen_output is covered by the hypothesis
-            'forbidden_phrase': 0,      # examples contain phrase from instructions
-            'negation_word': 0,         # examples contain negation words for contradiction
-            'large_gap': 0,             # examples contain large gap: ___________
-            'overlap_hypothesis_all': 0
-        }
-
+        discards = {}
         accepted = []
         for record in outputs:
             blocked, reason = self.heuristic_filtering(record, mode)
@@ -97,84 +80,24 @@ class AutomaticHeuristicFilter:
         return accepted
 
 
-class PerplexityFilter:
-
-    def __init__(self):
-        self.perplexity = load(
-            "perplexity", module_type="metric")
-
-    def run(self, data, cache, mode, threshold=50):
-        accepted = []
-        counter_ds = FilterDataset(data)
-        loader = DataLoader(counter_ds, batch_size=16, shuffle=False)
-
-        accepted_id = []
-        rejected_id = []
-        for i, batch in enumerate(tqdm(loader, position=0, leave=True)):
-            ppls = self.perplexity.compute(
-                predictions=batch[f"new_{mode}"],
-                model_id='gpt2'
-            )['perplexities']
-
-            accepted_ppl = np.where(np.array(ppls) < threshold)[0]
-            rejected_ppl = np.where(np.array(ppls) >= threshold)[0]
-
-            accepted_id += [batch['guid'][idx] for idx in accepted_ppl]
-            rejected_id += [batch['guid'][idx] for idx in rejected_ppl]
-
-            # for idx in accepted_ppl:
-            #     record = {
-            #         "guid": batch['guid'][idx],
-            #         "premise": batch['premise'][idx],
-            #         "hypothesis": batch['hypothesis'][idx],
-            #         "label": batch['label'][idx],
-            #         "new_label": batch['new_label'][idx],
-            #         "prefix": batch['prefix'][idx],
-            #         "suffix": batch['suffix'][idx],
-            #         "span_prev": batch['span_prev'][idx],
-            #         "gen_out": batch['gen_out'][idx],
-            #         "new_premise": batch['new_premise'][idx],
-            #         "accept": True
-            #     }
-            #     accepted.append(record)
-
-        for guid in accepted_id:
-            record = json.loads(cache.get(guid))
-            accepted.append(record)
-            cache.set(guid, json.dumps(record))
-
-        for guid in rejected_id:
-            record = json.loads(cache.get(guid))
-            record["accept"] = False
-            cache.set(guid, json.dumps(record))
-
-        return accepted
-
-
-class NLIEnsembleFilter:
-
-    def __init__(self, cache, mode, local_rank) -> None:
-        self.hf_model_names = [
-            # "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
-            # "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli",
-            # "alisawuffles/roberta-large-wanli"
-            "Joelzhang/deberta-v3-large-snli_mnli_fever_anli_R1_R2_R3-nli"
-        ]
-
-        self.device = f"cuda:{local_rank}"
+class SentencePairModelFilter(BaseFilter):
+    def __init__(self, cache, mode, model_names) -> None:
         self.tokenizers = {}
         self.models = {}
+        self.configs = {}
         self.cache = cache
         self.mode = mode
         self.global_counter = 0
 
-        for name in self.hf_model_names:
+        for name in model_names:
             tokenizer = AutoTokenizer.from_pretrained(name)
             model = AutoModelForSequenceClassification.from_pretrained(name)
-            model = model.to(self.device)
+            config = AutoConfig.from_pretrained(name)
+            model.cuda()
             model.eval()
             self.tokenizers[name] = tokenizer
             self.models[name] = model
+            self.configs[name] = config
 
     def predict(self, batch, batch_counter, model_name):
         tokenizer = self.tokenizers[model_name]
@@ -188,8 +111,6 @@ class NLIEnsembleFilter:
             max_length=128,
             return_token_type_ids=False
         )
-        input_seq_pair = input_seq_pair.to(self.device)
-
         counter_seq_pair = tokenizer.batch_encode_plus(
             batch_counter,
             return_tensors="pt",
@@ -198,6 +119,8 @@ class NLIEnsembleFilter:
             max_length=128,
             return_token_type_ids=False
         )
+
+        input_seq_pair = input_seq_pair.to(self.device)
         counter_seq_pair = counter_seq_pair.to(self.device)
 
         with torch.no_grad():
@@ -249,9 +172,8 @@ class NLIEnsembleFilter:
             batch_counter = list(zip(p_counter, counter_data["hypothesis"]))
         else:
             batch_counter = list(zip(counter_data["premise"], p_counter))
-        label = [label2id[x] for x in counter_data["label"]]
-        to_label = [label2id[x] for x in counter_data["new_label"]]
-
+        label = {k: [v.label2id[x] for x in counter_data["label"]] for k, v in self.models.items()}
+        to_label = {k: [v.label2id[x] for x in counter_data["new_label"]] for k, v in self.models.items()}
         return batch, batch_counter, label, to_label
 
     def post_process_batch(self, counter_data, batch_counter):
