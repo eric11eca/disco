@@ -1,22 +1,21 @@
-import json
 import string
 import torch
 import numpy as np
 import textdistance as tdist
 
 from tqdm import tqdm
-from evaluate import load
 from pprint import pprint
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
+from dataclasses import dataclass
+from torch.utils.data import Dataset, DataLoader
 
 from transformers import (
-    AutoConfig,
+    PreTrainedModel,
+    PreTrainedTokenizer,
     AutoTokenizer,
     AutoModelForSequenceClassification
 )
 
-from .db import update, query
+from .db import update, query, delete
 
 class BaseFilter():
     def _normalize(self, text):
@@ -29,6 +28,23 @@ class BaseFilter():
     
     def run(self, outputs, cache, mode):
         raise NotImplementedError
+
+@dataclass
+class HFModelContainer():
+    model: PreTrainedModel
+    tokenizer: PreTrainedTokenizer
+    label2id: dict
+    id2label: dict
+    name: str
+
+    def __dict__(self):
+        return {
+            "model": self.model,
+            "tokenizer": self.tokenizer,
+            "label2id": self.label2id,
+            "id2label": self.id2label,
+            "name": self.name
+        }
 
 
 class SentencePairHeuristicFilter(BaseFilter):
@@ -70,10 +86,10 @@ class SentencePairHeuristicFilter(BaseFilter):
         for record in outputs:
             blocked, reason = self.heuristic_filtering(record, mode)
             if blocked:
-                record["accept"] = False
-                update(cache, {"guid": record["guid"]}, {
-                       "$set": {"accept": False}})
-                discards[reason] += 1
+                # update(cache, {"guid": record["guid"]}, {
+                #        "$set": {"accept": False}})
+                delete(cache, {"gen_out": record.gen_out})
+                discards[reason] = discards.get(reason, 0) + 1
             else:
                 accepted.append(record)
         pprint(discards)
@@ -82,33 +98,34 @@ class SentencePairHeuristicFilter(BaseFilter):
 
 class SentencePairModelFilter(BaseFilter):
     def __init__(self, cache, mode, model_names) -> None:
-        self.tokenizers = {}
         self.models = {}
-        self.configs = {}
         self.cache = cache
         self.mode = mode
         self.global_counter = 0
 
         for name in model_names:
-            tokenizer = AutoTokenizer.from_pretrained(name)
             model = AutoModelForSequenceClassification.from_pretrained(name)
-            config = AutoConfig.from_pretrained(name)
             model.cuda()
             model.eval()
-            self.tokenizers[name] = tokenizer
-            self.models[name] = model
-            self.configs[name] = config
+            self.models[name] = HFModelContainer(
+                model=model,
+                tokenizer=AutoTokenizer.from_pretrained(name),
+                label2id = model.config.label2id,
+                id2label = model.config.id2label,
+                name=name
+            )
 
-    def predict(self, batch, batch_counter, model_name):
-        tokenizer = self.tokenizers[model_name]
-        model = self.models[model_name]
+    def tensorize(self, batch, batch_counter, model_name):
+        tokenizer = self.tokenizers[model_name].tokenizer
+        input_seqs = [tokenizer(x).input_ids for x in batch]
+        counter_seqs = [tokenizer(x).input_ids for x in batch_counter]
 
         input_seq_pair = tokenizer.batch_encode_plus(
             batch,
             return_tensors="pt",
             truncation=True,
             padding=True,
-            max_length=128,
+            max_length=max([len(x) for x in input_seqs]),
             return_token_type_ids=False
         )
         counter_seq_pair = tokenizer.batch_encode_plus(
@@ -116,13 +133,18 @@ class SentencePairModelFilter(BaseFilter):
             return_tensors="pt",
             truncation=True,
             padding=True,
-            max_length=128,
+            max_length=max([len(x) for x in counter_seqs]),
             return_token_type_ids=False
         )
 
-        input_seq_pair = input_seq_pair.to(self.device)
-        counter_seq_pair = counter_seq_pair.to(self.device)
+        input_seq_pair = input_seq_pair.to("cuda")
+        counter_seq_pair = counter_seq_pair.to("cuda")
 
+    def predict(self, batch, batch_counter, model_name):
+        input_seq_pair, counter_seq_pair = self.tensorize(
+            batch, batch_counter, model_name)
+        
+        model = self.models[model_name].model
         with torch.no_grad():
             logits = model(**input_seq_pair).logits
             logits_counter = model(**counter_seq_pair).logits
@@ -156,25 +178,21 @@ class SentencePairModelFilter(BaseFilter):
             return torch.sum(totals, -1)
 
     def preprocess_batch(self, counter_data):
-        batch = list(zip(counter_data["premise"], counter_data["hypothesis"]))
-        if self.mode == "premise":
-            original = counter_data["premise"]
-        else:
-            original = counter_data["hypothesis"]
-        perturbations = list(
-            zip(original,
-                counter_data["span_prev"],
-                counter_data["gen_out"])
-        )
+        batch = list(zip(counter_data["sentence1"], counter_data["sentence2"]))
 
-        p_counter = [p.replace(s, gen) for p, s, gen in perturbations]
-        if self.mode == "premise":
-            batch_counter = list(zip(p_counter, counter_data["hypothesis"]))
+        if self.mode == "sentence1":
+            perturbs = counter_data["new_sentence1"]
+            batch_counter = list(zip(perturbs, counter_data["sentence2"]))
         else:
-            batch_counter = list(zip(counter_data["premise"], p_counter))
-        label = {k: [v.label2id[x] for x in counter_data["label"]] for k, v in self.models.items()}
-        to_label = {k: [v.label2id[x] for x in counter_data["new_label"]] for k, v in self.models.items()}
-        return batch, batch_counter, label, to_label
+            perturbs = counter_data["new_sentence2"]   
+            batch_counter = list(zip(counter_data["sentence1"], perturbs))
+
+        src_label = {k: [v.label2id[x] for x in counter_data["label"]] 
+                     for k, v in self.models.items()}
+        tar_label = {k: [v.label2id[x] for x in counter_data["new_label"]] 
+                     for k, v in self.models.items()}
+
+        return batch, batch_counter, src_label, tar_label
 
     def post_process_batch(self, counter_data, batch_counter):
         filtered_data = []
