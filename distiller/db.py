@@ -58,23 +58,45 @@ def insert(collection, data):
 
 
 def delete(collection, query):
-    '''Deletes the record from the database
+    """Deletes the record from the database
     
     :param collection: the database instance
     :param query: the query to be used
-    '''
+    """
     collection.delete_one(query)
 
 
 def get_all(collection):
-    '''Returns all the records from the database
+    """Returns all the records from the database
     
     :param collection: the database instance
     :return: the records
-    '''
+    """
     records_ls = []
     records = collection.find({ })
     for record in records:
         del record['_id']
         records_ls.append(record)
     return records_ls
+
+def get_all_accepted(collection):
+    """
+    Returns all the accepted records from the database
+
+    :param collection: the database instance
+    :return: the accepted records
+    """
+    records_ls = []
+    records = collection.find({ "accept": True })
+    for record in records:
+        del record['_id']
+        records_ls.append(record)
+    return records_ls
+
+def group_by_key(collection, key="guid"):
+    agg_result = collection.aggregate([{
+        "$group": {"_id" : f"${key}", 
+        "count": {"$count" : {}}
+    }}])
+    grouped = [result for result in agg_result]
+    return grouped
