@@ -55,3 +55,24 @@ def insert(collection, data):
     :param data: the data to be used
     """
     collection.insert_one(data)
+
+def delete(collection, query):
+    """Deletes the record from the database
+    
+    :param collection: the database instance
+    :param query: the query to be used
+    """
+    collection.delete_one(query)
+
+def get_all(collection):
+    """Returns all the records from the database
+    
+    :param collection: the database instance
+    :return: the records
+    """
+    records_ls = []
+    records = collection.find({})
+    for record in records:
+        del record["_id"]
+        records_ls.append(record)
+    return records_ls
