@@ -12,7 +12,7 @@ from distiller.prompt.template.sentence_pair_classification import (
     SentencePairComposer,
     SentencePairExampleReader,
 )
-
+from distiller.filter.retrieval import FILTER_DICT
 
 class SNLITask(Task):
     Example = SentencePairExample
@@ -25,33 +25,38 @@ class SNLITask(Task):
     LABELS = ["entailment", "neutral", "contradiction"]
     LABEL_TO_ID, ID_TO_LABEL = labels_to_bimap(LABELS)
 
-    ATTR_MAP = {
-        "e2c": ["entailment", "contradiction"],
-        "c2e": ["contradiction", "entailment"],
-        "e2n": ["entailment", "neutral"],
-        "c2n": ["contradiction", "neutral"],
-        "n2c": ["neutral", "contradiction"],
-        "n2e": ["neutral", "entailment"],
-    }  # Attributions for controlling the counterfactuals
+    FILTER_ARGS = {
+        "threshold": 0.5,
+        "model_names": [
+            # "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
+            # "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli",
+            # "alisawuffles/roberta-large-wanli"
+            "Joelzhang/deberta-v3-large-snli_mnli_fever_anli_R1_R2_R3-nli"
+        ],
+        "forbidden": [
+            "it is true",
+            "it is false",
+            "it is true",
+            "it is false",
+            "[blank]",
+            "story:",
+            "conclusion:",
+            "context:",
+            "answer:",
+            "statement:",
+        ],
+        "negations": [
+            "no", "not", "none", "nobody", "nothing", "neither", "nowhere", "never",
+            "isn't", "wasn't", "shouldn't", "wouldn't", "couldn't", "won't", "can't",
+            "don't", "doesn't", "didn't", "aren't", "weren't", "shouldn't've", "wouldn't've",
+            "couldn't've", "won't've", "can't've", "don't've", "doesn't've", "didn't've",
+            "aren't've", "weren't've", "should not", "would not", "could not", "will not",
+        ]
+    }
 
-    NO_GEN_PHRASES = [
-        "it is true",
-        "it is false",
-        "it is true",
-        "it is false",
-        "[blank]",
-        "story:",
-        "conclusion:",
-        "context:",
-        "answer:",
-        "statement:",
-    ]
-
-    FILTER_MODELS = [
-        "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
-        "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli",
-        "alisawuffles/roberta-large-wanli"
-        "Joelzhang/deberta-v3-large-snli_mnli_fever_anli_R1_R2_R3-nli"
+    FILTERS = [
+        FILTER_DICT.SENTENCE_PAIR_HEURISTIC.value,
+        FILTER_DICT.SENTENCE_PAIR_MODEL.value
     ]
 
     @staticmethod
@@ -83,16 +88,13 @@ class SNLITask(Task):
     @classmethod
     def build_prompts(cls, args, cache):
         instances = cls._load_base_data(args)[args.start: args.end]
-
         templates = cls._load_template(cls.TASK, args.template_name)
-
         instruction = cls.Composer._compose_instruction(
             templates.instruction,
             {"answer_choices": templates.answer_choices, "label": args.target_label},
         )
 
         records = cls.Composer.read_and_compose(args, cache, instances, templates)
-
         if(args.no_demo):
             demonstration = []
         else:

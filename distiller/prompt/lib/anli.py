@@ -9,6 +9,7 @@ from distiller.prompt.template.sentence_pair_classification import (
     SentencePairComposer,
     SentencePairExampleReader
 )
+from distiller.filter.retrieval import FILTER_DICT
 
 
 class AdversarialNliTask(Task):
@@ -22,27 +23,38 @@ class AdversarialNliTask(Task):
     LABELS = ["entailment", "neutral", "contradiction"]
     LABEL_TO_ID, ID_TO_LABEL = labels_to_bimap(LABELS)
 
-    ATTR_MAP = {
-        "e2c": ["entailment", "contradiction"],
-        "c2e": ["contradiction", "entailment"],
-        "e2n": ["entailment", "neutral"],
-        "c2n": ["contradiction", "neutral"],
-        "n2c": ["neutral", "contradiction"],
-        "n2e": ["neutral", "entailment"],
-    }  # Attributions for controlling the counterfactuals
+    FILTER_ARGS = {
+        "threshold": 0.5,
+        "model_names": [
+            # "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
+            # "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli",
+            # "alisawuffles/roberta-large-wanli"
+            "Joelzhang/deberta-v3-large-snli_mnli_fever_anli_R1_R2_R3-nli"
+        ],
+        "forbidden": [
+            "it is true",
+            "it is false",
+            "it is true",
+            "it is false",
+            "[blank]",
+            "story:",
+            "conclusion:",
+            "context:",
+            "answer:",
+            "statement:",
+        ],
+        "negations": [
+            "no", "not", "none", "nobody", "nothing", "neither", "nowhere", "never",
+            "isn't", "wasn't", "shouldn't", "wouldn't", "couldn't", "won't", "can't",
+            "don't", "doesn't", "didn't", "aren't", "weren't", "shouldn't've", "wouldn't've",
+            "couldn't've", "won't've", "can't've", "don't've", "doesn't've", "didn't've",
+            "aren't've", "weren't've", "should not", "would not", "could not", "will not",
+        ]
+    }
 
-    NO_GEN_PHRASES = [
-        'it is true', 'it is false',
-        'it is true', 'it is false',
-        '[blank]', 'story:', 'conclusion:',
-        'context:', 'answer:', 'statement:'
-    ]
-
-    FILTER_MODELS = [
-        "ynie/roberta-large-snli_mnli_fever_anli_R1_R2_R3-nli",
-        "ynie/xlnet-large-cased-snli_mnli_fever_anli_R1_R2_R3-nli",
-        "alisawuffles/roberta-large-wanli"
-        "Joelzhang/deberta-v3-large-snli_mnli_fever_anli_R1_R2_R3-nli"
+    FILTERS = [
+        FILTER_DICT.SENTENCE_PAIR_HEURISTIC.value,
+        FILTER_DICT.SENTENCE_PAIR_MODEL.value
     ]
 
     @staticmethod
