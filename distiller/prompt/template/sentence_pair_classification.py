@@ -27,6 +27,8 @@ class SentencePairPrompt(BasePrompt):
     span_prev: Optional[str] = None
     sentence1_spans: Optional[List[str]] = None
     sentence2_spans: Optional[List[str]] = None
+    new_sentence1: Optional[str] = None
+    new_sentence2: Optional[str] = None
 
     def __dict__(self) -> dict:
         defualt = {
@@ -55,6 +57,32 @@ class SentencePairPrompt(BasePrompt):
             defualt["sentence2_spans"] = self.sentence2_spans
 
         return defualt
+    
+    @classmethod
+    def from_dict(cls, **kwargs):
+        """
+        Creates a SentencePairPrompt from a dict. 
+        Modify here when the json schema changes
+        """
+        return cls(
+            guid=kwargs.get("guid", None),
+            sentence1=kwargs.get("sentence1", None),
+            sentence2=kwargs.get("sentence2", None),
+            label=kwargs.get("label", None),
+            new_label=kwargs.get("new_label", None),
+            prompt=kwargs.get("prompt", None),
+            gen_out=kwargs.get("gen_out", None),
+            score=kwargs.get("score", None),
+            accept=kwargs.get("accept", None),
+            mode=kwargs.get("mode", None),
+            prefix=kwargs.get("prefix", None),
+            suffix=kwargs.get("suffix", None),
+            span_prev=kwargs.get("span_prev", None),
+            sentence1_spans=kwargs.get("sentence1_spans", None),
+            sentence2_spans=kwargs.get("sentence2_spans", None),
+            new_sentence1=kwargs.get("new_sentence1", None),
+            new_sentence2=kwargs.get("new_sentence2", None)
+        )
 
 
 @dataclass
@@ -213,9 +241,9 @@ class SentencePairComposer(BaseComposer):
             records = cls._read(instance, templates, args.target_label)
             seed_records.extend(records),
 
-        print("Committing prompts...")
-        for record in tqdm(seed_records):
-            cls._commit(record, cache)
+        # print("Committing prompts...")
+        # for record in tqdm(seed_records):
+        #     cls._commit(record, cache)
 
         seed_records = [record for record in seed_records]
 
