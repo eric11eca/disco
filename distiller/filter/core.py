@@ -3,19 +3,15 @@ import torch
 import numpy as np
 import textdistance as tdist
 
-from tqdm import tqdm
-from pprint import pprint
 from dataclasses import dataclass
 from torch.utils.data import DataLoader
-
 from transformers import (
     PreTrainedModel,
     PreTrainedTokenizer,
     AutoTokenizer,
     AutoModelForSequenceClassification
 )
-
-from distiller.db import update, query, delete
+from distiller.db import update, delete
 
 class BaseFilter():
     models: dict = {}
@@ -28,7 +24,7 @@ class BaseFilter():
         s = s.translate(str.maketrans('', '', string.punctuation))
         return s
     
-    def run(self, outputs, cache, mode):
+    def run(self, outputs, cache, **kwargs):
         raise NotImplementedError
 
 @dataclass
@@ -47,6 +43,15 @@ class HFModelContainer():
             "id2label": self.id2label,
             "name": self.name
         }
+    
+class FilterDataLoader():
+    def __init__(self, dataset, batch_size):
+        self.dataloader = DataLoader(
+            dataset,
+            batch_size=batch_size,
+            shuffle=False,
+            collate_fn=lambda x: x
+        )
 
 
 class SentencePairHeuristicFilter(BaseFilter):
@@ -93,8 +98,6 @@ class SentencePairHeuristicFilter(BaseFilter):
                 record, record.mode, 
                 kwargs["forbidden"], kwargs["negations"])
             if blocked:
-                # update(cache, {"guid": record["guid"]}, {
-                #        "$set": {"accept": False}})
                 delete(cache, {"gen_out": record.gen_out})
                 discards[reason] = discards.get(reason, 0) + 1
             else:
@@ -230,27 +233,3 @@ class SentencePairModelFilter(BaseFilter):
             batch[i].score = s[1]
 
         return batch
-
-
-def collect_accepted(cache):
-    accepted = []
-    rejected = []
-
-    cursor = list(cache.find({}))
-    for record in tqdm(cursor):
-        del record["_id"]
-        if record["accept"]:
-            accepted.append(record)
-        else:
-            rejected.append(record)
-
-    return accepted, rejected
-
-class FilterDataLoader():
-    def __init__(self, dataset, batch_size):
-        self.dataloader = DataLoader(
-            dataset,
-            batch_size=batch_size,
-            shuffle=False,
-            collate_fn=lambda x: x
-        )

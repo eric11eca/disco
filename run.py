@@ -14,7 +14,6 @@ from distiller.db import get_database, get_all
 from distiller.prompt.retrieval import get_task_class
 from distiller.generator import Generator
 from distiller.utils import write_json
-
 from distiller.filter.core import FilterDataLoader
 
 logging.basicConfig(
@@ -65,9 +64,7 @@ class DistillerRunner:
             task_filter = filter_class()
             for batch in tqdm(dataloader):
                 task_filter.run(batch, self.output_cache, **filter_args)
-        num_accepted = len([1 for record in get_all(self.output_cache) if record["accept"]])
-        num_rejected = len([1 for record in get_all(self.output_cache) if not record["accept"]])
-        logger.info(f"Filtering complete, {num_accepted} accepted and {num_rejected} rejected.")
+        logger.info("Filtering complete.")
     
     def filter_all_loop(self):
         logger.info("Filtering all previous generation outputs ...")
@@ -81,9 +78,13 @@ class DistillerRunner:
             task_filter = filter_class()
             for batch in tqdm(dataloader):
                 task_filter.run(batch, self.output_cache, **filter_args)
-        num_accepted = len([1 for record in get_all(self.output_cache) if record["accept"]])
-        num_rejected = len([1 for record in get_all(self.output_cache) if not record["accept"]])
-        logger.info(f"Filtering complete, {num_accepted} accepted and {num_rejected} rejected.")
+        logger.info("Filtering complete.")
+        self.report(all_records)
+            
+    def report(self, outputs):
+        num_accepted = len([1 for record in outputs if record["accept"]])
+        num_rejected = len([1 for record in outputs if not record["accept"]])
+        logger.info(f"Report: {num_accepted} accepted and {num_rejected} rejected.")
     
     def write_outputs(self, generation_outputs):
         meta_data = {
@@ -115,6 +116,7 @@ class DistillerRunner:
         generation_outputs = self.generate_loop(querys)
         self.filter_loop(generation_outputs)
         self.write_outputs(generation_outputs)
+        self.report(generation_outputs)
 
 
 def setup_path(args):
