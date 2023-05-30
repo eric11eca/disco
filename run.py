@@ -60,6 +60,7 @@ class DistillerRunner:
         dataloader = FilterDataLoader(generation_outputs, 16).dataloader
         filters = self.task_container.FILTERS
         filter_args = self.task_container.FILTER_ARGS
+        filter_args["device"] = self.device
         for filter_class in filters:
             task_filter = filter_class()
             for batch in tqdm(dataloader):
@@ -69,22 +70,24 @@ class DistillerRunner:
     def filter_all_loop(self):
         logger.info("Filtering all previous generation outputs ...")
         all_outputs = get_all(self.output_cache)
-        all_records = [
-            self.task_container.Prompt.from_dict(**record) for record in all_outputs]
-        dataloader = FilterDataLoader(all_records, 16).dataloader
+        # all_records = [
+        #     self.task_container.Prompt.from_dict(**record) for record in all_outputs]
+        dataloader = FilterDataLoader(all_outputs, 16).dataloader
         filters = self.task_container.FILTERS
         filter_args = self.task_container.FILTER_ARGS
+        filter_args["device"] = self.device
         for filter_class in filters:
             task_filter = filter_class()
             for batch in tqdm(dataloader):
                 task_filter.run(batch, self.output_cache, **filter_args)
         logger.info("Filtering complete.")
-        self.report(all_records)
+        self.report(all_outputs)
             
     def report(self, outputs):
-        num_accepted = len([1 for record in outputs if record["accept"]])
-        num_rejected = len([1 for record in outputs if not record["accept"]])
-        logger.info(f"Report: {num_accepted} accepted and {num_rejected} rejected.")
+        accepted = [record for record in outputs if record['accept']]
+        rejected = [record for record in outputs if not record['accept']]
+        logger.info(f"Report: {len(accepted)} accepted and {len(rejected)} rejected.")
+        return accepted
     
     def write_outputs(self, generation_outputs):
         meta_data = {
@@ -110,37 +113,57 @@ class DistillerRunner:
         )
         write_json(output_file, output_pth,)
         logger.info(f"Outputs written to {output_pth}.")
+
+        all_outputs = get_all(self.output_cache)
+        accepted = self.report(all_outputs)
+        augment_file = {
+            "meta_data": meta_data,
+            "outputs": accepted
+        }
+        augment_pth = os.path.join(
+            self.args.aug_pth,
+            f"{timestr}.json",
+        )
+        write_json(augment_file, augment_pth)
+        logger.info(f"Augmentations written to {augment_pth}.")
     
     def main_loop(self):
         querys = self.compose_loop()
         generation_outputs = self.generate_loop(querys)
         self.filter_loop(generation_outputs)
         self.write_outputs(generation_outputs)
-        self.report(generation_outputs)
+        
 
 
 def setup_path(args):
     category = f"{args.source_label}_{args.target_label}"
     output_dir = os.path.join(
         args.data_dir, args.dataset, "output", category)
-    if(not os.path.isdir(output_dir)):
-        os.makedirs(output_dir, exist_ok=True)
-
+    
     source = f"{args.source_label}.jsonl"
-    input_pth = os.path.join(
+    input_dir = os.path.join(
         args.data_dir, args.dataset, "input", source)
     
-    demo_pth = os.path.join(
+    demo_dir = os.path.join(
         args.data_dir, args.dataset, "examples", category)
     
-    aug_pth = os.path.join(
+    aug_dir = os.path.join(
         args.data_dir, args.dataset, "augment", category)
-
+    
+    if(not os.path.isdir(output_dir)):
+        os.makedirs(output_dir, exist_ok=True)
+    if(not os.path.isdir(input_dir)):
+        os.makedirs(input_dir, exist_ok=True)
+    if(not os.path.isdir(demo_dir)):
+        os.makedirs(demo_dir, exist_ok=True)
+    if(not os.path.isdir(aug_dir)):
+        os.makedirs(aug_dir, exist_ok=True)
+    
     with open_dict(args):
         args.output_dir = output_dir
-        args.input_pth = input_pth
-        args.demo_pth = demo_pth
-        args.aug_pth = aug_pth
+        args.input_pth = input_dir
+        args.demo_pth = demo_dir
+        args.aug_pth = aug_dir
 
 
 @hydra.main(config_path="config/secret/", config_name="keys", version_base="1.3.2")
