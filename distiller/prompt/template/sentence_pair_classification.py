@@ -55,6 +55,10 @@ class SentencePairPrompt(BasePrompt):
             defualt["sentence1_spans"] = self.sentence1_spans
         if self.sentence2_spans:
             defualt["sentence2_spans"] = self.sentence2_spans
+        if self.new_sentence1:
+            defualt["new_sentence1"] = self.new_sentence1
+        if self.new_sentence2:
+            defualt["new_sentence2"] = self.new_sentence2
 
         return defualt
     
