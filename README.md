@@ -17,3 +17,10 @@ Following the instruction [here] (https://www.prisma.io/dataguide/mongodb/settin
 
 
 ## Install Requirements
+To install essential requirements, please execute the following command:
+```
+pip install -r requirements.txt
+```
+For any other packages that may be required, please see the error messages and install accordingly.
+
+## 
