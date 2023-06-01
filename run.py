@@ -70,8 +70,6 @@ class DistillerRunner:
     def filter_all_loop(self):
         logger.info("Filtering all previous generation outputs ...")
         all_outputs = get_all(self.output_cache)
-        # all_records = [
-        #     self.task_container.Prompt.from_dict(**record) for record in all_outputs]
         dataloader = FilterDataLoader(all_outputs, 16).dataloader
         filters = self.task_container.FILTERS
         filter_args = self.task_container.FILTER_ARGS
@@ -82,6 +80,7 @@ class DistillerRunner:
                 task_filter.run(batch, self.output_cache, **filter_args)
         logger.info("Filtering complete.")
         self.report(all_outputs)
+        self.write_augmentations(all_outputs)
             
     def report(self, outputs):
         accepted = [record for record in outputs if record['accept']]
@@ -114,24 +113,33 @@ class DistillerRunner:
         write_json(output_file, output_pth,)
         logger.info(f"Outputs written to {output_pth}.")
 
-        all_outputs = get_all(self.output_cache)
-        accepted = self.report(all_outputs)
+    def write_augmentations(self, accepted):
+        meta_data = {
+            "dataset": self.args.dataset,
+            "template_name": self.args.template_name,
+        }
+
         augment_file = {
             "meta_data": meta_data,
             "outputs": accepted
         }
+        timestr = time.strftime("%Y%m%d-%H%M%S")
         augment_pth = os.path.join(
             self.args.aug_pth,
             f"{timestr}.json",
         )
         write_json(augment_file, augment_pth)
         logger.info(f"Augmentations written to {augment_pth}.")
+        
     
     def main_loop(self):
         querys = self.compose_loop()
         generation_outputs = self.generate_loop(querys)
         self.filter_loop(generation_outputs)
         self.write_outputs(generation_outputs)
+        all_outputs = get_all(self.output_cache)
+        accepted = self.report(all_outputs)
+        self.write_augmentations(accepted)
         
 
 
@@ -177,7 +185,7 @@ def main(args: DictConfig):
     input_cache, output_cache = get_database(args.dataset, args.template_name)
     runner = DistillerRunner(args, input_cache, output_cache)
     setup_path(args)
-    if args.do_filter:
+    if args.filter_all:
         runner.filter_all_loop()
     else:
         runner.main_loop()

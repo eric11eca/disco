@@ -2,8 +2,6 @@ pytorch-lightning
 transformers
 datasets
 openai
-wandb
-redis
 torch
 pymongo
 sentence-transformers

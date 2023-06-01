@@ -1,32 +1,32 @@
-#paths:
-  data_dir: ./data/
+# paths:
+  data_dir: ./data/                   # path to the data directory, default to ./data
 
-#data_params:
-  dataset: snli                         # base dataset for conterfactual generation
-  task_name: snli                       # the type of task defined in prompt.retrieval
-  start: 0                              # start position of the dataset for the current batch
-  end: 11                               # end position of the dataset for the current batch
-  template_name: masked_cad_premise     # template name for counterfactual generation 
-  source_label: entailment              # source label for counterfactual generation
-  target_label: neutral                 # target label for counterfactual generation
+# data_params:
+  dataset: snli                       # base dataset for conterfactual generation
+  task_name: snli                     # the type of task defined in prompt.retrieval
+  start: 0                            # start position of the dataset for the current batch
+  end: 11                             # end position of the dataset for the current batch
+  template_name: masked_cad_premise   # template name for counterfactual generation 
+  source_label: entailment            # source label for counterfactual generation
+  target_label: neutral               # target label for counterfactual generation
 
-#generator_params:
-  gen_type: completion                  # gpt-3 generation mode: completion | insertion | chat
-  model_name: gpt-3-003                 # generation model name: gpt-3-003 | gpt-3-002 | chatgpt | gpt-4
-  overgenerate: False                   # determine whether it is able to generate more than 1 counterfactual instances for an input instance
-  no_demo: True                         # determine if generating without in-context examples in the prompt
+# generator_params:
+  gen_type: completion                # gpt-3 generation mode: completion | insertion | chat
+  model_name: gpt-3-003               # engine name: gpt-3-003 | gpt-3-002 | chatgpt | gpt-4
+  overgenerate: True                  # more than 1 generations for an input data
+  no_demo: False                      # zero-shop generation without in-context examples
 
-#search_params: 
-  num_neighbors: 8                               # number of nearest neighbors
-  embed_type: CLS                                # type of embedding method
-  metric: euclidean                              # distance metric used for nearest neighbor
-  encoder_name: roberta-large-nli-mean-tokens    # "name of the encoder for sentence embedding
-  prompt_search: True                            # enable dynamically selecting demonstrations
+# search_params: 
+  num_neighbors: 8                             # number of nearest neighbors
+  embed_type: CLS                              # type of embedding method
+  metric: euclidean                            # distance metric for nearest neighbor
+  encoder_name: roberta-large-nli-mean-tokens  # encoder name for sentence embedding
+  prompt_search: False                         # enable dynamic demonstration selection 
 
-#filter_params:
-  do_filter: False                      # whether to run through the filter after generation
+# filter_params:
+  filter_all: True                    # filter all previous generation outputs
 
-#util_params:
+# util_params:
   local_rank: 0                         # locak rank of cuda devices
   api_idx: 0                            # api index if multiple api tokens
 
