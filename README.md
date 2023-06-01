@@ -17,7 +17,7 @@ We find that learning with this counterfactual data yields a comparatively small
 
 
 ## Install MongoDB
-Following the instruction [here] (https://www.prisma.io/dataguide/mongodb/setting-up-a-local-mongodb-database#setting-up-mongodb-on-macos) to install MongoDB local server on your machine. Also install MongoDB Compass for user-friendly database management. [Download](https://www.mongodb.com/try/download/compass) the version propoer to your operating system.
+Following the instruction [here](https://www.prisma.io/dataguide/mongodb/setting-up-a-local-mongodb-database#setting-up-mongodb-on-macos) to install MongoDB local server on your machine. Also install MongoDB Compass for user-friendly database management. [Download](https://www.mongodb.com/try/download/compass) the version propoer to your operating system.
 
 
 ## Requirements
