@@ -7,7 +7,7 @@
 
 # DISCO: Distilling Phrasal Counterfactuals with Large Language Models
 
-This is the public codebase for arxiv paper: [DISCO: Distilling Phrasal Counterfactuals with Large Language Models](https://arxiv.org/abs/2212.10534)
+This is the public codebase for arxiv paper: [DISCO: Distilling Counterfactuals with Large Language Models](https://arxiv.org/abs/2212.10534)
 
 
 ## About DISCO
