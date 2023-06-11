@@ -95,6 +95,11 @@ To run filtering on all previous generated outputs, set `filter_all` to `False` 
 python run.py
 ```
 
+## Generated DISCO Data
+- You can find the DISCO augmentation data used for our experiments here: `data/disco.jsonl`
+- For a more extensive set of counterfactual data, you can take a look at the `data/augment` folder
+- Feel free to generate and filter more counterfactual data using the pipeline.
+
 ## License
 
 [![MIT license](https://img.shields.io/badge/License-MIT-blue.svg)](https://lbesson.mit-license.org/)
