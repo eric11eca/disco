@@ -107,12 +107,11 @@ class BaseComposer:
             insert(cache, record.__dict__())
 
     @classmethod
-    def read_and_compose(cls, instances, cache, templates):
+    def read_and_compose(cls, instances, templates):
         """The method responsible for parsing in the input file. Implemented here
         to make the overall pipeline more transparent.
 
         :param instances: instances to be processed for perturbation
-        :param cache: the database instance
         :param templates: the templates to be used for prompt
         """
         NotImplemented

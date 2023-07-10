@@ -111,7 +111,10 @@ class SentencePairExampleReader(BaseExampleReader):
         :param instance: the instance to be read
         :rtype instance: situation_modeling.readers.input_example.InputBase
         """
-        guid = instance["guid"]
+        if("guid" in instance):
+            guid = instance["guid"]
+        else:
+            guid = -1
         if("input" in instance and "output" in instance):
             text_input = instance["input"]
             text_output = instance["output"]
@@ -132,7 +135,7 @@ class SentencePairExampleReader(BaseExampleReader):
     
     @staticmethod
     def _compose_example(template, render_items):
-        example_prompt = super()._compose_example(template=template, render_items=render_items)
+        example_prompt = BaseExampleReader._compose_example(template=template, render_items=render_items)
         #example_prompt += f"\nAnswer: {render_items['answer']}\n"
         return example_prompt
 
@@ -247,7 +250,7 @@ class SentencePairComposer(BaseComposer):
         return problems
 
     @classmethod
-    def read_and_compose(cls, args, cache, instances, templates):
+    def read_and_compose(cls, args, instances, templates):
         """The method responsible for parsing in the input file. Implemented here
         to make the overall pipeline more transparent.
 

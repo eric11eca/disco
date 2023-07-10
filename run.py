@@ -25,13 +25,12 @@ transformers.logging.set_verbosity_error()
 
 
 class DistillerRunner:
-    def __init__(self, args, input_cache, output_cache):
+    def __init__(self, args, output_cache):
         self.args = args
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         if torch.backends.mps.is_available():
             self.device = "mps"
         self.generator = Generator(args)
-        self.input_cache = input_cache
         self.output_cache = output_cache
         self.generation_outputs = []
         hydra.core.global_hydra.GlobalHydra.instance().clear()
@@ -40,7 +39,7 @@ class DistillerRunner:
 
     def compose_loop(self):
         logger.info("Loading input data and composing prompts ...")
-        querys = self.task_container.build_prompts(self.args, self.input_cache)
+        querys = self.task_container.build_prompts(self.args)
         logger.info(f"Composed {len(querys)} prompts.")
         return querys
     
@@ -145,6 +144,7 @@ class DistillerRunner:
 
 def setup_path(args):
     category = f"{args.source_label}_{args.target_label}"
+    category_file = category+".jsonl"
     output_dir = os.path.join(
         args.data_dir, args.dataset, "output", category)
     
@@ -153,17 +153,15 @@ def setup_path(args):
         args.data_dir, args.dataset, "input", source)
     
     demo_dir = os.path.join(
-        args.data_dir, args.dataset, "examples", category)
+        args.data_dir, args.dataset, "examples", category_file)
     
     aug_dir = os.path.join(
         args.data_dir, args.dataset, "augment", category)
     
     if(not os.path.isdir(output_dir)):
         os.makedirs(output_dir, exist_ok=True)
-    if(not os.path.isdir(input_dir)):
-        os.makedirs(input_dir, exist_ok=True)
-    if(not os.path.isdir(demo_dir)):
-        os.makedirs(demo_dir, exist_ok=True)
+    assert os.path.isfile(input_dir)
+    assert os.path.isfile(demo_dir)
     if(not os.path.isdir(aug_dir)):
         os.makedirs(aug_dir, exist_ok=True)
     
@@ -182,8 +180,8 @@ def set_up_api(keys: DictConfig):
 
 @hydra.main(config_path="config", config_name="config", version_base="1.3.2")
 def main(args: DictConfig):
-    input_cache, output_cache = get_database(args.dataset, args.template_name)
-    runner = DistillerRunner(args, input_cache, output_cache)
+    output_cache = get_database(args.dataset, args.template_name)
+    runner = DistillerRunner(args, output_cache)
     setup_path(args)
     if args.filter_all:
         runner.filter_all_loop()

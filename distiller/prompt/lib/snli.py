@@ -93,7 +93,7 @@ class SNLITask(Task):
         return base_data
 
     @classmethod
-    def build_prompts(cls, args, cache):
+    def build_prompts(cls, args):
         instances = cls._load_base_data(args)[args.start: args.end]
         templates, template = cls._load_template(cls.TASK, args.template_name, args.gen_type)
         instruction = cls.Composer._compose_instruction(
@@ -101,7 +101,7 @@ class SNLITask(Task):
             {"answer_choices": templates.answer_choices, "label": args.target_label},
         )
 
-        records = cls.Composer.read_and_compose(args, cache, instances, templates)
+        records = cls.Composer.read_and_compose(args, instances, templates)
         if(args.no_demo):
             demonstration = []
         else:

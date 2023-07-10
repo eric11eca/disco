@@ -18,14 +18,11 @@ def get_database(dataset="snli", template_name="masked_cad_premise"):
     client = MongoClient(CONNECTION_STRING)
     collection = client.get_database('disco')
 
-    input_name = f"{dataset}_{template_name}_input"
     gen_name = f"{dataset}_{template_name}_gen"
 
-    create_collection(collection, input_name)
     create_collection(collection, gen_name)
-    input_cache = collection[input_name]
     output_cache = collection[gen_name]
-    return input_cache, output_cache
+    return output_cache
 
 def query(collection, query):
     """Queries the database for the given query
