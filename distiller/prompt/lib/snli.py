@@ -59,6 +59,7 @@ class SNLITask(Task):
         FILTER_DICT.SENTENCE_PAIR_MODEL.value
     ]
 
+
     @staticmethod
     def _load_examples(args):
         examples_from_file = read_jsonl(args.demo_pth)
@@ -66,10 +67,16 @@ class SNLITask(Task):
         return examples
 
     @staticmethod
-    def _load_template(task, template_name):
+    def _load_template(task, template_name, gen_type):
         cfg = compose(config_name=task)
-        template = cfg.templates[template_name]
-        return template
+        templates = cfg.templates[template_name]
+        if(gen_type == "completion"):
+            template = templates.template
+        elif(gen_type == "insert"):
+            template = templates.template_insert
+        else:
+            template = templates.template
+        return templates, template
 
     @staticmethod
     def _craft(record, demonstration, instruction, model):
@@ -88,7 +95,7 @@ class SNLITask(Task):
     @classmethod
     def build_prompts(cls, args, cache):
         instances = cls._load_base_data(args)[args.start: args.end]
-        templates = cls._load_template(cls.TASK, args.template_name)
+        templates, template = cls._load_template(cls.TASK, args.template_name, args.gen_type)
         instruction = cls.Composer._compose_instruction(
             templates.instruction,
             {"answer_choices": templates.answer_choices, "label": args.target_label},
@@ -98,7 +105,7 @@ class SNLITask(Task):
         if(args.no_demo):
             demonstration = []
         else:
-            demonstration = cls.ExampleReader.jsonl_file_reader(args.demo_pth)
+            demonstration = cls.ExampleReader.jsonl_file_reader(args.demo_pth, template)
             demonstration = random.choices(demonstration, k=4)
 
         querys = []

@@ -54,12 +54,15 @@ class BaseExample:
     def __dict__(self) -> dict:
         return {
             "guid": self.guid,
-            "text_input": self.score,
-            "text_output": self.accept,
+            "text_input": self.text_input,
+            "text_output": self.text_output,
         }
 
     def __str__(self) -> str:
         return json.dumps(self.__dict__(), indent=2)
+    
+    def self_construct(self) -> str:
+        return f"{self.text_input}\n{self.text_output}\n\n"
 
 
 class BaseComposer:
@@ -129,25 +132,39 @@ class BaseExampleReader:
         return prompt
 
     @staticmethod
-    def _read(instance):
+    def _read(instance, template):
         """Reads a single json line from the target file. Modify here when the json schema changes
 
         :param instance: the instance to be read
         :rtype instance: situation_modeling.readers.input_example.InputBase
+        :param templates: the templates to construct demonstration examples if needed
         """
         NotImplemented
 
+    @staticmethod
+    def _compose_example(template, render_items):
+        """Compose a prompt for the sentence pair example only if the prompt is not given for an example instance
+           Can be overriden by subclasses
+
+        :param template: the template to be used for prompt
+        :param render_items: vrariables for template rendering
+        :rtype prompt: str
+        """
+        prompt = env.from_string(template).render(**render_items)
+        return prompt
+
     @classmethod
-    def jsonl_file_reader(cls, demo_pth):
+    def jsonl_file_reader(cls, demo_pth, template):
         """The method responsible for parsing in the input file. Implemented here
         to make the overall pipeline more transparent.
 
         :param demo_pth: the path to the demonstration file
+        :param templates: the templates to construct demonstration examples if needed
         """
         demonstrations = []
         instances = read_jsonl(demo_pth)
         for instance in instances:
-            demonstration = cls._read(instance)
+            demonstration = cls._read(instance, template)
             demonstrations.append(demonstration)
         return demonstrations
     

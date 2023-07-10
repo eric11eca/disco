@@ -66,7 +66,7 @@ class GPTQuery:
         else:
             prompt = f"{self.instruction} \n\n"
         for example in self.examples:
-            prompt += f"{example.text_input}\n{example.text_output}\n\n"
+            prompt += example.self_construct()
         prompt += record.prompt
 
         return prompt

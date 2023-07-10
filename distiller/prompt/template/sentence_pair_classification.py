@@ -105,18 +105,36 @@ class SentencePairExample(BaseExample):
 
 class SentencePairExampleReader(BaseExampleReader):
     @staticmethod
-    def _read(instance):
+    def _read(instance, template):
         """Reads a single json line from the target file. Modify here when the json schema changes
 
         :param instance: the instance to be read
         :rtype instance: situation_modeling.readers.input_example.InputBase
         """
         guid = instance["guid"]
-        text_input = instance["input"]
-        text_output = instance["output"]
+        if("input" in instance and "output" in instance):
+            text_input = instance["input"]
+            text_output = instance["output"]
+        else:
+            render_items = {
+                "sentence1": instance['sentence1'],
+                "sentence2": instance['sentence2'],
+                "span": instance['span_changed'],
+                "answer": instance['span_to'],
+            }
+            answer = instance['span_to']
+            text_input = SentencePairExampleReader._compose_example(template, render_items)
+            text_output = answer
+
         return SentencePairExample(
             guid=guid, text_input=text_input, text_output=text_output
         )
+    
+    @staticmethod
+    def _compose_example(template, render_items):
+        example_prompt = super()._compose_example(template=template, render_items=render_items)
+        #example_prompt += f"\nAnswer: {render_items['answer']}\n"
+        return example_prompt
 
 
 class SentencePairComposer(BaseComposer):
