@@ -16,7 +16,6 @@ DISCO is a framework for automatically generating high-quality counterfactual da
 We find that learning with this counterfactual data yields a comparatively small student model that is 6% (absolute) more robust and generalizes 5% better across distributions than baselines on various challenging evaluations. This model is also 15% more sensitive in differentiating original and counterfactual examples, on three evaluation sets written by human workers and via human-AI collaboration.
 
 ## Features TODO
-- [ ] Build demonstrations into prompt format automaticlly when loading examples from the disk.
 - [ ] Enable KNN-and-sentence-embedding-based demonstration search.
 - [ ] Enable reinforcement learning for demonstration search.
 - [ ] Add option to turn on & off database features.
