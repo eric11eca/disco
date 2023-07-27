@@ -20,7 +20,6 @@ We find that learning with this counterfactual data yields a comparatively small
 - [ ] Enable KNN-and-sentence-embedding-based demonstration search.
 - [ ] Enable reinforcement learning for demonstration search.
 - [ ] Add option to turn on & off database features.
-- [ ] Remove the step of building the input table in the database.
 - [ ] Add prompt supports for Single-Sentence-Classification (ex, sentiment analysis).
 - [ ] Return top-5 log-likelihood from OpenAI API calls.
 
